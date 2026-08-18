@@ -350,6 +350,9 @@ Como posso te ajudar hoje?</div>
 </div>
 
 <script>
+// Endereço do Cloudflare Worker que roda a IA (gratuito — veja CONFIGURACAO.md)
+const WORKER_URL = 'https://nova-ia-2026.juarez-veloso.workers.dev';
+
 const history = [];
 const systemPrompt = `Você é uma IA assistente avançada chamada "Nova IA 2026", com base de conhecimento atualizada até maio de 2026. Você é inteligente, curiosa, direta e fala em português brasileiro de forma natural e amigável.
 
@@ -396,12 +399,19 @@ async function sendMessage() {
   const typingEl = appendTyping();
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    if (WORKER_URL.includes('COLOQUE-AQUI')) {
+      typingEl.remove();
+      history.pop();
+      appendMessage('ai', 'Configuração pendente: publique o Cloudflare Worker e cole o endereço dele na constante WORKER_URL no início do index.html. Veja o passo a passo em CONFIGURACAO.md.');
+      btn.disabled = false;
+      input.focus();
+      return;
+    }
+
+    const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
         system: systemPrompt,
         messages: history
       })
@@ -410,14 +420,21 @@ async function sendMessage() {
     const data = await res.json();
     typingEl.remove();
 
-    const reply = data.content?.find(b => b.type === 'text')?.text
-      || 'Não consegui processar sua pergunta. Tente novamente.';
+    if (!res.ok) {
+      history.pop();
+      const motivo = data?.error?.message || ('código ' + res.status);
+      appendMessage('ai', 'O serviço de IA retornou um erro: ' + motivo);
+    } else {
+      const reply = data.reply
+        || 'Não consegui processar sua pergunta. Tente novamente.';
 
-    history.push({ role: 'assistant', content: reply });
-    appendMessage('ai', reply);
+      history.push({ role: 'assistant', content: reply });
+      appendMessage('ai', reply);
+    }
   } catch(e) {
     typingEl.remove();
-    appendMessage('ai', 'Erro de conexão. Verifique sua internet e tente novamente.');
+    history.pop();
+    appendMessage('ai', 'Não consegui falar com o servidor de IA. Verifique sua internet e se o Worker está publicado, e tente novamente.');
   }
 
   btn.disabled = false;
