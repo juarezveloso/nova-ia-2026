@@ -136,17 +136,24 @@
     position: relative;
     z-index: 10;
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll;
     padding: 24px;
     display: flex;
     flex-direction: column;
     gap: 16px;
     scroll-behavior: smooth;
+    scrollbar-width: thin;                          /* Firefox */
+    scrollbar-color: var(--accent) var(--surface);  /* Firefox */
   }
 
-  #messages::-webkit-scrollbar { width: 4px; }
-  #messages::-webkit-scrollbar-track { background: transparent; }
-  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  #messages::-webkit-scrollbar { width: 10px; }
+  #messages::-webkit-scrollbar-track { background: var(--surface); border-radius: 8px; }
+  #messages::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    border: 2px solid var(--surface);
+  }
+  #messages::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
 
   .msg-row {
     display: flex;
