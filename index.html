@@ -21,11 +21,14 @@
     --ai-bg: #111118;
   }
 
+  html, body { height: 100%; }
+
   body {
     font-family: 'Syne', sans-serif;
     background: var(--bg);
     color: var(--text);
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh; /* celulares: desconta a barra do navegador */
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -136,6 +139,7 @@
     position: relative;
     z-index: 10;
     flex: 1;
+    min-height: 0; /* permite a área encolher e ativar a rolagem */
     overflow-y: scroll;
     padding: 24px;
     display: flex;
