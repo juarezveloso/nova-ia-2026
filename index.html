@@ -461,6 +461,33 @@
     padding: 5px 8px; font-size: 11px;
     font-family: 'Space Mono', monospace;
   }
+
+  /* ── Telas estreitas (celular) ──────────────────────────── */
+  .header-info { min-width: 0; }
+  .header-info h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #barra-voz > span { white-space: nowrap; flex-shrink: 0; }
+  #seletor-voz { min-width: 0; }
+
+  @media (max-width: 520px) {
+    .so-tela-larga { display: none; }
+
+    header { padding: 12px 14px; gap: 10px; }
+    .avatar { width: 34px; height: 34px; font-size: 13px; }
+    .header-info h1 { font-size: 15px; }
+    .header-info p { font-size: 10px; }
+
+    #voz-ia-btn { width: 32px; height: 32px; }
+    #voz-ia-btn svg { width: 15px; height: 15px; }
+    header .badge { font-size: 9px; padding: 3px 7px; letter-spacing: 0.04em; margin-left: 8px; }
+
+    #barra-voz { padding: 7px 14px; font-size: 10px; }
+    #seletor-voz { font-size: 10px; padding: 4px 6px; max-width: none; }
+
+    #messages { padding: 16px 14px; }
+    .bubble { max-width: 84%; }
+    #input-area { padding: 12px 14px 16px; }
+    .hint { font-size: 10px; }
+  }
 </style>
 </head>
 <body>
@@ -469,12 +496,12 @@
   <div class="avatar">IA</div>
   <div class="header-info">
     <h1>Nova IA 2026</h1>
-    <p><span class="status-dot"></span>Online — base atualizada até 2026</p>
+    <p><span class="status-dot"></span>Online<span class="so-tela-larga"> — base atualizada até 2026</span></p>
   </div>
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.4</div>
+  <div class="badge">v2026.5</div>
 </header>
 
 
