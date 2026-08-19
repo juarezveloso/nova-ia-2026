@@ -1,2 +1,5 @@
 .wrangler/
 node_modules/
+_*.cjs
+_*.js
+_*.html
