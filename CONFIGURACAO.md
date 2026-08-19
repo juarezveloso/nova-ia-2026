@@ -124,4 +124,8 @@ Observações:
 - **O navegador vai pedir permissão** do microfone na primeira vez. Se você
   negar sem querer, libere no cadeado ao lado do endereço.
 - Se o navegador não tiver nenhum dos dois caminhos, o botão some sozinho.
+- **Pausas não encerram a gravação.** O navegador para de ouvir sozinho depois
+  de alguns segundos de silêncio; o código reinicia a escuta automaticamente e
+  continua acrescentando ao que já foi dito. Só para quando você clica no
+  microfone de novo.
 - O idioma está fixado em português do Brasil (`pt-BR`).

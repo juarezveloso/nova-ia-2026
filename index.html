@@ -963,7 +963,7 @@ function iniciarVoz() {
   ouvindo = true;
   marcarBotaoVoz(true);
   if (RECONHECIMENTO_NATIVO) {
-    mostrarStatusVoz('🎤 Ouvindo… pode falar');
+    mostrarStatusVoz('🎤 Ouvindo… fale à vontade (clique no microfone para parar)');
     iniciarReconhecimentoNativo();
   } else {
     mostrarStatusVoz('🎤 Gravando… clique no microfone para parar');
@@ -990,6 +990,9 @@ function pararVoz(jaEncerrou) {
 
 // Caminho 1: reconhecimento nativo do navegador
 function iniciarReconhecimentoNativo() {
+  // Se sobrou um reconhecedor anterior, encerra antes de abrir outro.
+  if (reconhecedor) { try { reconhecedor.abort(); } catch (erro) {} reconhecedor = null; }
+
   reconhecedor = new RECONHECIMENTO_NATIVO();
   reconhecedor.lang = 'pt-BR';
   reconhecedor.continuous = true;
@@ -998,19 +1001,29 @@ function iniciarReconhecimentoNativo() {
   const input = document.getElementById('user-input');
   textoAntesDaFala = input.value.trim() ? input.value.trim() + ' ' : '';
   trechosFinais = '';
+  let reinicios = 0;
 
+  // Reconstrói o texto inteiro a cada evento em vez de somar pedaços.
+  // O navegador reenvia trechos já finalizados, e somar com += fazia a
+  // mesma frase aparecer 2 ou 3 vezes.
   reconhecedor.onresult = function (e) {
+    let finais = '';
     let parcial = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
+    for (let i = 0; i < e.results.length; i++) {
       const trecho = e.results[i][0].transcript;
-      if (e.results[i].isFinal) trechosFinais += trecho;
+      if (e.results[i].isFinal) finais += trecho;
       else parcial += trecho;
     }
-    input.value = textoAntesDaFala + trechosFinais + parcial;
+    trechosFinais = finais;
+    const falado = (finais + ' ' + parcial).replace(/\s+/g, ' ').trim();
+    input.value = textoAntesDaFala + falado;
     autoResize(input);
   };
 
   reconhecedor.onerror = function (e) {
+    // Silêncio curto ou parada normal não são erros: o onend recomeça sozinho.
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+
     const motivos = {
       'not-allowed': 'Permissão do microfone negada — libere nas configurações do navegador',
       'service-not-allowed': 'O navegador bloqueou o reconhecimento de voz',
@@ -1024,7 +1037,24 @@ function iniciarReconhecimentoNativo() {
   };
 
   reconhecedor.onend = function () {
-    if (ouvindo) { // encerrou sozinho (silêncio prolongado)
+    if (!ouvindo) return; // o usuário mandou parar: nada a fazer
+
+    // O navegador encerra a escuta sozinho após alguns segundos de silêncio.
+    // Como o usuário não pediu para parar, recomeçamos — guardando o que já
+    // foi dito, porque a nova sessão começa com a lista de resultados vazia.
+    const jaDito = (textoAntesDaFala + ' ' + trechosFinais).replace(/\s+/g, ' ').trim();
+    textoAntesDaFala = jaDito ? jaDito + ' ' : '';
+    trechosFinais = '';
+
+    reinicios++;
+    if (reinicios > 40) { // trava de segurança contra laço infinito
+      mostrarStatusVoz('');
+      pararVoz(true);
+      return;
+    }
+    try {
+      reconhecedor.start();
+    } catch (erro) {
       mostrarStatusVoz('');
       pararVoz(true);
     }
