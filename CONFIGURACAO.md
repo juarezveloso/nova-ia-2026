@@ -63,3 +63,37 @@ nenhum custo.
 - **Se um dia quiser usar o Claude (Anthropic):** é a versão paga — basta
   voltar o `worker.js` para chamar `api.anthropic.com` com uma chave guardada
   como segredo no Worker (me peça que eu preparo de novo).
+
+## Anexar documentos para análise
+
+O chat tem um botão de clipe (📎) ao lado do campo de texto. Também dá para
+**arrastar arquivos** para cima da página ou **colar** uma imagem com Ctrl+V.
+
+Formatos lidos automaticamente:
+
+| Tipo | Extensões | Como é lido |
+|---|---|---|
+| Texto e código | txt, md, csv, json, xml, html, py, js, sql, log, yml… | direto |
+| PDF | pdf | texto extraído página a página (até 80 páginas) |
+| Word | docx | texto extraído |
+| Excel | xlsx, xlsm, ods | cada planilha vira uma tabela em texto |
+| PowerPoint | pptx | texto de cada slide |
+| OpenOffice | odt, odp | texto extraído |
+| Imagens | png, jpg, gif, webp, bmp | analisadas por um modelo de visão |
+| PDF escaneado | pdf sem texto | a 1ª página é analisada como imagem |
+
+Observações:
+
+- **Tudo é lido no navegador do visitante.** O arquivo em si não é enviado a
+  lugar nenhum — só o texto extraído vai para a IA. Isso é bom para privacidade
+  e não gasta banda do servidor.
+- **Limites:** 25 MB por arquivo e cerca de 40 mil caracteres de texto por
+  documento (o excesso é cortado, e o chip avisa quando isso acontece).
+- **Imagens:** uma por mensagem (limitação do modelo de visão). Se você anexar
+  várias, as demais ficam na bandeja para o envio seguinte.
+- **Formatos antigos do Office** (.doc, .xls, .ppt) não são lidos — salve como
+  .docx, .xlsx ou .pptx.
+- **Modelo de visão:** o `worker.js` usa `@cf/llava-hf/llava-1.5-7b-hf`, que não
+  exige aceitar licença. O modelo de visão da Meta (llama-3.2-vision) é melhor,
+  mas antes de usá-lo é preciso aceitar a licença da Meta no painel da
+  Cloudflare — se quiser, aceite lá e troque a constante MODELO_VISAO.

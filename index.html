@@ -321,6 +321,68 @@
   }
 
   .sug-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* ── Anexos ─────────────────────────────────────────────── */
+  #attach-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    border-radius: 8px;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  #attach-btn:hover { background: rgba(108,99,255,0.15); }
+  #attach-btn svg { width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.2s; }
+  #attach-btn:hover svg { stroke: var(--accent2); }
+
+  #attachments {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 10px;
+  }
+  #attachments:empty { display: none; }
+
+  .chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 7px 10px;
+    font-size: 12px;
+    max-width: 260px;
+    animation: fadeUp 0.2s ease;
+  }
+  .chip.erro { border-color: rgba(255,90,90,0.5); }
+  .chip-icone { font-size: 14px; flex-shrink: 0; }
+  .chip-texto { overflow: hidden; }
+  .chip-nome {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: var(--text); font-weight: 600;
+  }
+  .chip-info { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 10px; }
+  .chip.erro .chip-info { color: #ff7a7a; }
+  .chip-x {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 16px; line-height: 1; padding: 0 2px; flex-shrink: 0;
+  }
+  .chip-x:hover { color: #ff7a7a; }
+
+  .girando { display: inline-block; animation: girar 1s linear infinite; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+
+  /* Aviso de arrastar arquivo */
+  #dropzone {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(10,10,15,0.92);
+    border: 2px dashed var(--accent);
+    display: none;
+    align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 600; color: var(--accent2);
+    text-align: center; padding: 24px;
+  }
+  #dropzone.ativo { display: flex; }
 </style>
 </head>
 <body>
@@ -350,14 +412,21 @@ Como posso te ajudar hoje?</div>
   </div>
 </div>
 
+<div id="dropzone">Solte os arquivos aqui para analisar 📄</div>
+
 <div id="input-area">
+  <div id="attachments"></div>
   <div class="input-wrapper">
-    <textarea id="user-input" placeholder="Digite sua pergunta..." rows="1"></textarea>
+    <input type="file" id="file-input" multiple hidden>
+    <button id="attach-btn" onclick="document.getElementById('file-input').click()" title="Anexar documento ou imagem">
+      <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+    </button>
+    <textarea id="user-input" placeholder="Digite sua pergunta ou anexe um documento..." rows="1"></textarea>
     <button id="send-btn" onclick="sendMessage()" title="Enviar">
       <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
   </div>
-  <p class="hint">Enter para enviar • Shift+Enter para nova linha</p>
+  <p class="hint">Enter para enviar • Shift+Enter para nova linha • 📎 anexe PDF, Word, Excel, imagens…</p>
 </div>
 
 <script>
@@ -393,39 +462,67 @@ function suggest(text) {
 
 async function sendMessage() {
   const input = document.getElementById('user-input');
-  const text = input.value.trim();
-  if (!text) return;
+  const texto = input.value.trim();
+
+  if (anexos.some(function (a) { return a.status === 'lendo'; })) {
+    appendMessage('ai', 'Só um instante: ainda estou lendo um dos arquivos anexados.');
+    return;
+  }
+
+  const prontos = anexos.filter(function (a) { return a.status === 'pronto'; });
+  if (!texto && !prontos.length) return;
 
   document.getElementById('suggestions').style.display = 'none';
-
   input.value = '';
   input.style.height = 'auto';
 
   const btn = document.getElementById('send-btn');
   btn.disabled = true;
 
-  appendMessage('user', text);
-  history.push({ role: 'user', content: text });
+  const documentos = prontos.filter(function (a) { return a.tipo === 'texto'; });
+  const imagens = prontos.filter(function (a) { return a.tipo === 'imagem'; });
+  const imagem = imagens.length ? imagens[0] : null;
+
+  // O que aparece na tela (sem despejar o documento inteiro)
+  const nomes = documentos.map(function (d) { return d.nome; });
+  if (imagem) nomes.push(imagem.nome);
+  const visivel = nomes.length
+    ? (texto ? texto + '\n\n' : '') + '📎 ' + nomes.join(' • ')
+    : texto;
+  appendMessage('user', visivel);
+
+  // O que a IA recebe
+  let conteudo = texto;
+  if (documentos.length) {
+    const blocos = documentos.map(function (d) {
+      return '=== DOCUMENTO: ' + d.nome + ' ===\n' + d.texto + '\n=== FIM DE ' + d.nome + ' ===';
+    });
+    conteudo = 'Analise o conteúdo abaixo e responda em português brasileiro.\n\n' +
+      blocos.join('\n\n') + '\n\nPergunta: ' +
+      (texto || 'Resuma o documento e destaque os pontos principais.');
+  } else if (imagem && !texto) {
+    conteudo = 'Descreva e analise em detalhes este documento/imagem.';
+  }
+  if (imagem) conteudo = '[imagem anexada: ' + imagem.nome + ']\n' + conteudo;
+
+  history.push({ role: 'user', content: conteudo });
+
+  // Esvazia a bandeja, mas guarda imagens extras para os próximos envios
+  const sobras = imagens.slice(1);
+  anexos.length = 0;
+  sobras.forEach(function (s) { anexos.push(s); });
+  renderizarAnexos();
 
   const typingEl = appendTyping();
 
   try {
-    if (WORKER_URL.includes('COLOQUE-AQUI')) {
-      typingEl.remove();
-      history.pop();
-      appendMessage('ai', 'Configuração pendente: publique o Cloudflare Worker e cole o endereço dele na constante WORKER_URL no início do index.html. Veja o passo a passo em CONFIGURACAO.md.');
-      btn.disabled = false;
-      input.focus();
-      return;
-    }
+    const corpo = { system: systemPrompt, messages: history };
+    if (imagem) corpo.image = imagem.base64;
 
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system: systemPrompt,
-        messages: history
-      })
+      body: JSON.stringify(corpo)
     });
 
     const data = await res.json();
@@ -433,19 +530,21 @@ async function sendMessage() {
 
     if (!res.ok) {
       history.pop();
-      const motivo = data?.error?.message || ('código ' + res.status);
+      const motivo = (data && data.error && data.error.message) ? data.error.message : ('código ' + res.status);
       appendMessage('ai', 'O serviço de IA retornou um erro: ' + motivo);
     } else {
-      const reply = data.reply
-        || 'Não consegui processar sua pergunta. Tente novamente.';
-
+      const reply = data.reply || 'Não consegui processar sua pergunta. Tente novamente.';
       history.push({ role: 'assistant', content: reply });
       appendMessage('ai', reply);
+      if (sobras.length) {
+        appendMessage('ai', 'Consigo analisar uma imagem por vez. Ainda há ' + sobras.length +
+          ' anexada(s) — é só enviar de novo para eu continuar.');
+      }
     }
-  } catch(e) {
+  } catch (e) {
     typingEl.remove();
     history.pop();
-    appendMessage('ai', 'Não consegui falar com o servidor de IA. Verifique sua internet e se o Worker está publicado, e tente novamente.');
+    appendMessage('ai', 'Não consegui falar com o servidor de IA. Verifique sua internet e tente novamente.');
   }
 
   btn.disabled = false;
@@ -490,6 +589,306 @@ function appendTyping() {
   msgs.scrollTop = msgs.scrollHeight;
   return row;
 }
+
+// ── Anexos: leitura de documentos de vários formatos ──────────────────────
+const anexos = [];
+const LIMITE_TEXTO = 40000;              // caracteres por documento
+const LIMITE_ARQUIVO = 25 * 1024 * 1024; // 25 MB
+
+const EXT_TEXTO = new Set(['txt','md','markdown','csv','tsv','json','xml','html','htm','css','js','mjs','ts','jsx','tsx','py','java','c','cpp','cc','h','hpp','cs','php','rb','go','rs','swift','kt','sql','sh','bat','ps1','yml','yaml','ini','cfg','conf','log','srt','vtt','tex','r','lua','toml','env','gitignore','dockerfile','makefile','svg','vue','scss','less','properties','bib']);
+const EXT_IMAGEM = new Set(['png','jpg','jpeg','gif','webp','bmp']);
+const EXT_PLANILHA = new Set(['xlsx','xls','xlsm','ods']);
+
+const bibliotecas = {};
+function carregarBiblioteca(url) {
+  if (bibliotecas[url]) return bibliotecas[url];
+  bibliotecas[url] = new Promise((ok, falha) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => ok();
+    s.onerror = () => falha(new Error('não consegui carregar a biblioteca de leitura (verifique a internet)'));
+    document.head.appendChild(s);
+  });
+  return bibliotecas[url];
+}
+
+function extensaoDe(nome) {
+  const p = nome.lastIndexOf('.');
+  return p >= 0 ? nome.slice(p + 1).toLowerCase() : '';
+}
+
+function formatarTamanho(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+function pareceTexto(str) {
+  if (!str) return false;
+  const amostra = str.slice(0, 3000);
+  let ruins = 0;
+  for (let i = 0; i < amostra.length; i++) {
+    const c = amostra.charCodeAt(i);
+    if (c === 0 || c === 0xFFFD || c < 9 || (c > 13 && c < 32)) ruins++;
+  }
+  return ruins / amostra.length < 0.05;
+}
+
+// Escolhe o leitor certo para cada formato
+async function extrairConteudo(file) {
+  const ext = extensaoDe(file.name);
+
+  if (EXT_IMAGEM.has(ext) || file.type.startsWith('image/')) {
+    return { tipo: 'imagem', base64: await reduzirImagem(file, 1400) };
+  }
+  if (ext === 'pdf' || file.type === 'application/pdf') return await lerPdf(file);
+  if (ext === 'docx') return await lerDocx(file);
+  if (ext === 'pptx') return await lerPptx(file);
+  if (EXT_PLANILHA.has(ext)) return await lerPlanilha(file);
+  if (ext === 'odt' || ext === 'odp') return await lerOpenDocument(file);
+  if (EXT_TEXTO.has(ext) || file.type.startsWith('text/') ||
+      file.type.includes('json') || file.type.includes('xml')) {
+    return { tipo: 'texto', texto: await file.text() };
+  }
+
+  // Formato desconhecido: tenta interpretar como texto puro
+  const bruto = await file.text();
+  if (pareceTexto(bruto)) return { tipo: 'texto', texto: bruto };
+
+  if (ext === 'doc' || ext === 'ppt' || ext === 'xls') {
+    throw new Error('formato antigo do Office — salve como .docx, .pptx ou .xlsx');
+  }
+  throw new Error('formato não legível como texto (exporte para PDF, DOCX ou TXT)');
+}
+
+async function lerPdf(file) {
+  await carregarBiblioteca('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+
+  let texto = '';
+  const paginas = Math.min(pdf.numPages, 80);
+  for (let i = 1; i <= paginas; i++) {
+    const pagina = await pdf.getPage(i);
+    const conteudo = await pagina.getTextContent();
+    texto += '\n--- Página ' + i + ' ---\n' + conteudo.items.map(x => x.str).join(' ');
+  }
+  if (pdf.numPages > paginas) {
+    texto += '\n\n[...o documento tem ' + pdf.numPages + ' páginas; li as ' + paginas + ' primeiras...]';
+  }
+
+  // PDF escaneado (sem camada de texto) → analisa a 1ª página como imagem
+  if (texto.replace(/[\s\-]|Página|\d/g, '').length < 30) {
+    return {
+      tipo: 'imagem',
+      base64: await renderizarPaginaPdf(pdf, 1),
+      aviso: 'PDF escaneado — analisando a 1ª página como imagem',
+    };
+  }
+  return { tipo: 'texto', texto: texto };
+}
+
+async function renderizarPaginaPdf(pdf, numero) {
+  const pagina = await pdf.getPage(numero);
+  const base = pagina.getViewport({ scale: 1 });
+  const escala = Math.min(2, 1400 / Math.max(base.width, base.height));
+  const viewport = pagina.getViewport({ scale: escala });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  await pagina.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+  return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+}
+
+async function lerDocx(file) {
+  await carregarBiblioteca('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+  const r = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+  if (!r.value.trim()) throw new Error('o documento parece estar vazio');
+  return { tipo: 'texto', texto: r.value };
+}
+
+async function lerPlanilha(file) {
+  await carregarBiblioteca('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+  const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' });
+  let texto = '';
+  wb.SheetNames.forEach(function (nome) {
+    const csv = XLSX.utils.sheet_to_csv(wb.Sheets[nome]);
+    if (csv.trim()) texto += '\n--- Planilha: ' + nome + ' ---\n' + csv + '\n';
+  });
+  if (!texto.trim()) throw new Error('a planilha parece estar vazia');
+  return { tipo: 'texto', texto: texto };
+}
+
+async function lerPptx(file) {
+  await carregarBiblioteca('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const slides = Object.keys(zip.files)
+    .filter(function (n) { return /^ppt\/slides\/slide\d+\.xml$/.test(n); })
+    .sort(function (a, b) { return parseInt(a.match(/\d+/)[0]) - parseInt(b.match(/\d+/)[0]); });
+  let texto = '';
+  for (let i = 0; i < slides.length; i++) {
+    const xml = await zip.files[slides[i]].async('string');
+    const partes = Array.from(xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)).map(function (m) { return m[1]; });
+    texto += '\n--- Slide ' + (i + 1) + ' ---\n' + partes.join(' ');
+  }
+  if (!texto.trim()) throw new Error('não encontrei texto nos slides');
+  return { tipo: 'texto', texto: decodificarXml(texto) };
+}
+
+async function lerOpenDocument(file) {
+  await carregarBiblioteca('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const arquivo = zip.file('content.xml');
+  if (!arquivo) throw new Error('arquivo OpenDocument inválido');
+  const xml = await arquivo.async('string');
+  const texto = xml.replace(/<\/text:p>/g, '\n').replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ');
+  if (!texto.trim()) throw new Error('o documento parece estar vazio');
+  return { tipo: 'texto', texto: decodificarXml(texto) };
+}
+
+function decodificarXml(s) {
+  return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+          .replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+}
+
+async function reduzirImagem(file, maxLado) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise(function (ok, falha) {
+      const i = new Image();
+      i.onload = function () { ok(i); };
+      i.onerror = function () { falha(new Error('não consegui abrir a imagem')); };
+      i.src = url;
+    });
+    const fator = Math.min(1, maxLado / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * fator));
+    canvas.height = Math.max(1, Math.round(img.height * fator));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// ── Fila de anexos e interface ────────────────────────────────────────────
+async function adicionarArquivos(lista) {
+  const arquivos = Array.from(lista);
+  for (const file of arquivos) {
+    const item = { nome: file.name, tamanho: file.size, status: 'lendo' };
+    anexos.push(item);
+    renderizarAnexos();
+
+    if (file.size > LIMITE_ARQUIVO) {
+      item.status = 'erro';
+      item.erro = 'arquivo muito grande (máx. ' + formatarTamanho(LIMITE_ARQUIVO) + ')';
+      renderizarAnexos();
+      continue;
+    }
+
+    try {
+      const r = await extrairConteudo(file);
+      item.tipo = r.tipo;
+      item.aviso = r.aviso;
+      if (r.tipo === 'texto') {
+        const t = r.texto.replace(/\n{4,}/g, '\n\n\n').trim();
+        item.cortado = t.length > LIMITE_TEXTO;
+        item.texto = item.cortado ? t.slice(0, LIMITE_TEXTO) : t;
+        if (!item.texto) throw new Error('não encontrei texto neste arquivo');
+      } else {
+        item.base64 = r.base64;
+      }
+      item.status = 'pronto';
+    } catch (e) {
+      item.status = 'erro';
+      item.erro = e && e.message ? e.message : 'não consegui ler este arquivo';
+    }
+    renderizarAnexos();
+  }
+}
+
+function removerAnexo(indice) {
+  anexos.splice(indice, 1);
+  renderizarAnexos();
+}
+
+function renderizarAnexos() {
+  const area = document.getElementById('attachments');
+  area.innerHTML = '';
+  anexos.forEach(function (a, i) {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (a.status === 'erro' ? ' erro' : '');
+
+    const icone = document.createElement('span');
+    icone.className = 'chip-icone';
+    icone.textContent = a.status === 'lendo' ? '⏳'
+      : a.status === 'erro' ? '⚠️'
+      : a.tipo === 'imagem' ? '🖼️' : '📄';
+    if (a.status === 'lendo') icone.classList.add('girando');
+
+    const bloco = document.createElement('div');
+    bloco.className = 'chip-texto';
+    const nome = document.createElement('div');
+    nome.className = 'chip-nome';
+    nome.textContent = a.nome;
+    const info = document.createElement('div');
+    info.className = 'chip-info';
+    if (a.status === 'lendo') info.textContent = 'lendo…';
+    else if (a.status === 'erro') info.textContent = a.erro;
+    else if (a.tipo === 'imagem') info.textContent = a.aviso || 'imagem pronta';
+    else info.textContent = a.texto.length.toLocaleString('pt-BR') + ' caracteres' + (a.cortado ? ' (cortado)' : '');
+    bloco.appendChild(nome);
+    bloco.appendChild(info);
+
+    const x = document.createElement('button');
+    x.className = 'chip-x';
+    x.textContent = '×';
+    x.title = 'Remover';
+    x.onclick = function () { removerAnexo(i); };
+
+    chip.appendChild(icone);
+    chip.appendChild(bloco);
+    chip.appendChild(x);
+    area.appendChild(chip);
+  });
+}
+
+// Eventos: escolher arquivo, arrastar-e-soltar e colar
+document.getElementById('file-input').addEventListener('change', function (e) {
+  adicionarArquivos(e.target.files);
+  e.target.value = '';
+});
+
+let contadorArrasto = 0;
+const zonaSolta = document.getElementById('dropzone');
+window.addEventListener('dragenter', function (e) {
+  if (!e.dataTransfer || Array.from(e.dataTransfer.types).indexOf('Files') === -1) return;
+  e.preventDefault();
+  contadorArrasto++;
+  zonaSolta.classList.add('ativo');
+});
+window.addEventListener('dragover', function (e) {
+  if (zonaSolta.classList.contains('ativo')) e.preventDefault();
+});
+window.addEventListener('dragleave', function () {
+  contadorArrasto--;
+  if (contadorArrasto <= 0) { contadorArrasto = 0; zonaSolta.classList.remove('ativo'); }
+});
+window.addEventListener('drop', function (e) {
+  if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+  e.preventDefault();
+  contadorArrasto = 0;
+  zonaSolta.classList.remove('ativo');
+  adicionarArquivos(e.dataTransfer.files);
+});
+document.getElementById('user-input').addEventListener('paste', function (e) {
+  const arquivos = e.clipboardData && e.clipboardData.files ? Array.from(e.clipboardData.files) : [];
+  if (arquivos.length) { e.preventDefault(); adicionarArquivos(arquivos); }
+});
+
 </script>
 </body>
 </html>
