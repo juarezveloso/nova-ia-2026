@@ -499,6 +499,63 @@
   }
   #testar-voz:hover { border-color: var(--accent); background: rgba(108,99,255,0.15); }
   #testar-voz:active { transform: scale(0.95); }
+
+  /* ── Links, tabelas e arquivos gerados ──────────────────── */
+  .link-msg { color: var(--accent2); text-decoration: underline; word-break: break-all; }
+  .link-msg:hover { color: #fff; }
+
+  .tabela-caixa { margin: 10px 0; overflow-x: auto; }
+  .tabela-msg {
+    border-collapse: collapse; font-size: 12.5px; min-width: 100%;
+    font-family: 'Space Mono', monospace;
+  }
+  .tabela-msg th, .tabela-msg td {
+    border: 1px solid var(--border); padding: 6px 10px; text-align: left; white-space: nowrap;
+  }
+  .tabela-msg th { background: rgba(108,99,255,0.18); color: var(--text); font-weight: 700; }
+  .tabela-msg tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .tabela-acoes { display: flex; gap: 8px; margin-top: 8px; }
+
+  .btn-baixar {
+    background: var(--surface2); color: var(--accent2);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 12px; cursor: pointer;
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    transition: all 0.2s;
+  }
+  .btn-baixar:hover { border-color: var(--accent); background: rgba(108,99,255,0.18); }
+  .btn-baixar:active { transform: scale(0.96); }
+  .btn-baixar:disabled { opacity: 0.5; cursor: wait; }
+  .btn-baixar.destaque {
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    color: #fff; border-color: transparent; font-weight: 700;
+  }
+
+  .cartao-arquivo {
+    margin: 10px 0; padding: 12px;
+    background: rgba(108,99,255,0.08);
+    border: 1px solid rgba(108,99,255,0.35); border-radius: 12px;
+  }
+  .cartao-topo { display: flex; align-items: center; gap: 10px; }
+  .cartao-icone { font-size: 22px; flex-shrink: 0; }
+  .cartao-info { flex: 1; min-width: 0; }
+  .cartao-nome {
+    font-weight: 700; font-size: 13px; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cartao-detalhe { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; }
+  .cartao-previa {
+    margin-top: 10px; padding: 8px; max-height: 120px; overflow: auto;
+    background: rgba(0,0,0,0.35); border-radius: 8px;
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    color: var(--muted); white-space: pre; line-height: 1.5;
+  }
+
+  @media (max-width: 520px) {
+    .tabela-msg { font-size: 11px; }
+    .tabela-msg th, .tabela-msg td { padding: 5px 7px; }
+    .cartao-previa { font-size: 9px; }
+  }
 </style>
 </head>
 <body>
@@ -512,7 +569,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.9</div>
+  <div class="badge">v2026.10</div>
 </header>
 
 
@@ -574,7 +631,36 @@ Características:
 - Usa linguagem natural e acessível
 - Quando não souber algo com certeza, diz claramente
 - Mantém respostas concisas (máximo 3-4 parágrafos)
-- Não usa markdown com asteriscos ou hashtags no texto`;
+- Não usa asteriscos para negrito no meio do texto
+
+GERAÇÃO DE ARQUIVOS
+Quando o usuário pedir um arquivo (planilha, documento, relatório, lista para baixar),
+escreva uma frase curta explicando e em seguida o conteúdo dentro de um bloco assim:
+
+\`\`\`arquivo:orcamento.xlsx
+| Item | Quantidade | Valor |
+|---|---|---|
+| Cimento | 40 | 32,50 |
+\`\`\`
+
+O bloco vira automaticamente um botão de download na tela do usuário.
+Nunca diga para copiar e colar o conteúdo nem explique como salvar o arquivo:
+apenas diga que o arquivo está pronto para baixar.
+
+Extensões que você pode usar no nome:
+- .xlsx ou .csv para dados em tabela (use sempre tabela em markdown dentro do bloco)
+- .docx para textos, relatórios e documentos
+- .pdf para documentos destinados a impressão
+- .txt para texto simples
+
+TABELAS
+Sempre que a resposta tiver dados comparáveis, apresente em tabela markdown —
+ela aparece formatada e o usuário pode baixar em Excel com um clique.
+
+LINKS
+Escreva endereços completos começando com https:// para virarem clicáveis.
+Nunca invente endereços: só cite sites que você tem certeza que existem, e se
+não souber o endereço exato, diga o nome do site em vez de arriscar um link errado.`;
 
 function autoResize(el) {
   el.style.height = 'auto';
@@ -697,14 +783,15 @@ function appendMessage(role, text) {
 
   const bubble = document.createElement('div');
   bubble.className = `bubble ${role}`;
-  bubble.textContent = text;
+  if (role === 'ai') renderizarResposta(bubble, text);  // links, tabelas e arquivos
+  else bubble.textContent = text;
 
   row.appendChild(av);
   row.appendChild(bubble);
   msgs.appendChild(row);
   msgs.scrollTop = msgs.scrollHeight;
 
-  if (role === 'ai') falar(text); // lê a resposta em voz alta, se ligado
+  if (role === 'ai') falar(textoParaFala(text)); // lê em voz alta, sem a marcação
 }
 
 function appendTyping() {
@@ -1593,6 +1680,351 @@ if (!TEM_SINTESE) {
   setTimeout(carregarVozes, 400);
   setTimeout(carregarVozes, 1500);
   window.addEventListener('beforeunload', pararFala);
+}
+
+
+// ── Links clicáveis, tabelas e geração de arquivos ────────────────────────
+// Os arquivos são montados no próprio navegador (não passam pelo servidor):
+// nada de cota gasta e o conteúdo não sai do aparelho até você baixar.
+
+const REGEX_LINK = /https?:\/\/[^\s<>"')\]}]+/g;
+const REGEX_BLOCO_ARQUIVO = /```arquivo:\s*([^\n`]+)\r?\n([\s\S]*?)```/g;
+
+// Insere texto criando âncoras para os endereços encontrados.
+function inserirComLinks(destino, texto) {
+  let posicao = 0;
+  REGEX_LINK.lastIndex = 0;
+  let achado;
+  while ((achado = REGEX_LINK.exec(texto)) !== null) {
+    if (achado.index > posicao) {
+      destino.appendChild(document.createTextNode(texto.slice(posicao, achado.index)));
+    }
+    // Tira pontuação final que costuma grudar no fim da frase
+    let endereco = achado[0].replace(/[.,;:!?]+$/, '');
+    const a = document.createElement('a');
+    a.className = 'link-msg';
+    a.href = endereco;             // a regex só aceita http/https: seguro
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = endereco;
+    destino.appendChild(a);
+    posicao = achado.index + endereco.length;
+  }
+  if (posicao < texto.length) {
+    destino.appendChild(document.createTextNode(texto.slice(posicao)));
+  }
+}
+
+function ehLinhaDeTabela(linha) {
+  return /^\s*\|.*\|\s*$/.test(linha);
+}
+function ehSeparadorDeTabela(linha) {
+  return /^\s*\|[\s:|-]+\|\s*$/.test(linha) && linha.indexOf('-') !== -1;
+}
+function celulasDaLinha(linha) {
+  return linha.trim().replace(/^\|/, '').replace(/\|$/, '')
+    .split('|').map(function (c) { return c.trim(); });
+}
+
+// Converte uma tabela em markdown para matriz de linhas e colunas.
+function tabelaParaMatriz(linhas) {
+  return linhas
+    .filter(function (l) { return !ehSeparadorDeTabela(l); })
+    .map(celulasDaLinha);
+}
+
+function criarTabela(linhas) {
+  const matriz = tabelaParaMatriz(linhas);
+  const caixa = document.createElement('div');
+  caixa.className = 'tabela-caixa';
+
+  const tabela = document.createElement('table');
+  tabela.className = 'tabela-msg';
+  matriz.forEach(function (linha, i) {
+    const tr = document.createElement('tr');
+    linha.forEach(function (celula) {
+      const td = document.createElement(i === 0 ? 'th' : 'td');
+      td.textContent = celula;
+      tr.appendChild(td);
+    });
+    tabela.appendChild(tr);
+  });
+  caixa.appendChild(tabela);
+
+  const acoes = document.createElement('div');
+  acoes.className = 'tabela-acoes';
+  [['Excel', 'tabela.xlsx'], ['CSV', 'tabela.csv']].forEach(function (par) {
+    const b = document.createElement('button');
+    b.className = 'btn-baixar';
+    b.textContent = '⬇ ' + par[0];
+    b.onclick = function () { baixarMatriz(matriz, par[1]); };
+    acoes.appendChild(b);
+  });
+  caixa.appendChild(acoes);
+  return caixa;
+}
+
+// Cartão de download para um bloco ```arquivo:nome```
+function criarCartaoArquivo(nome, conteudo) {
+  const cartao = document.createElement('div');
+  cartao.className = 'cartao-arquivo';
+
+  const icone = document.createElement('span');
+  icone.className = 'cartao-icone';
+  icone.textContent = iconeDoArquivo(nome);
+
+  const info = document.createElement('div');
+  info.className = 'cartao-info';
+  const titulo = document.createElement('div');
+  titulo.className = 'cartao-nome';
+  titulo.textContent = nome;
+  const detalhe = document.createElement('div');
+  detalhe.className = 'cartao-detalhe';
+  const linhas = conteudo.trim().split('\n').length;
+  detalhe.textContent = linhas + (linhas === 1 ? ' linha' : ' linhas') + ' • pronto para baixar';
+  info.appendChild(titulo);
+  info.appendChild(detalhe);
+
+  const botao = document.createElement('button');
+  botao.className = 'btn-baixar destaque';
+  botao.textContent = '⬇ Baixar';
+  botao.onclick = function () {
+    botao.disabled = true;
+    botao.textContent = 'gerando…';
+    gerarEbaixar(nome, conteudo).then(function () {
+      botao.disabled = false;
+      botao.textContent = '⬇ Baixar';
+    }).catch(function (e) {
+      botao.disabled = false;
+      botao.textContent = '⬇ Baixar';
+      detalhe.textContent = 'não consegui gerar: ' + (e && e.message ? e.message : e);
+    });
+  };
+
+  const previa = document.createElement('pre');
+  previa.className = 'cartao-previa';
+  previa.textContent = conteudo.trim().split('\n').slice(0, 6).join('\n') +
+    (linhas > 6 ? '\n…' : '');
+
+  const topo = document.createElement('div');
+  topo.className = 'cartao-topo';
+  topo.appendChild(icone);
+  topo.appendChild(info);
+  topo.appendChild(botao);
+
+  cartao.appendChild(topo);
+  cartao.appendChild(previa);
+  return cartao;
+}
+
+function iconeDoArquivo(nome) {
+  const ext = extensaoDe(nome);
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return '📊';
+  if (ext === 'docx' || ext === 'doc') return '📝';
+  if (ext === 'pdf') return '📕';
+  return '📄';
+}
+
+// Monta o conteúdo e dispara o download.
+async function gerarEbaixar(nome, conteudo) {
+  const ext = extensaoDe(nome);
+  const texto = conteudo.replace(/\r\n/g, '\n').trim();
+  const linhas = texto.split('\n');
+  const temTabela = linhas.some(ehLinhaDeTabela);
+
+  if (ext === 'xlsx') {
+    const matriz = temTabela ? tabelaParaMatriz(linhas.filter(ehLinhaDeTabela))
+      : linhas.map(function (l) { return [l]; });
+    return baixarMatriz(matriz, nome);
+  }
+  if (ext === 'csv') {
+    const matriz = temTabela ? tabelaParaMatriz(linhas.filter(ehLinhaDeTabela))
+      : linhas.map(function (l) { return [l]; });
+    return baixarMatriz(matriz, nome);
+  }
+  if (ext === 'docx') return baixarDocx(texto, nome);
+  if (ext === 'pdf') return baixarPdf(texto, nome);
+  return baixarBlob(new Blob([texto], { type: 'text/plain;charset=utf-8' }), nome);
+}
+
+async function baixarMatriz(matriz, nome) {
+  const ext = extensaoDe(nome);
+  if (ext === 'csv') {
+    const csv = matriz.map(function (linha) {
+      return linha.map(function (c) {
+        const v = String(c == null ? '' : c);
+        return /[",;\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(';');
+    }).join('\n');
+    // BOM para o Excel abrir os acentos corretamente
+    return baixarBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), nome);
+  }
+
+  await carregarBiblioteca('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(matriz);
+  ws['!cols'] = (matriz[0] || []).map(function (_, i) {
+    let largura = 10;
+    matriz.forEach(function (l) {
+      if (l[i]) largura = Math.max(largura, Math.min(50, String(l[i]).length + 2));
+    });
+    return { wch: largura };
+  });
+  XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+  const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return baixarBlob(new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  }), nome.replace(/\.[^.]+$/, '') + '.xlsx');
+}
+
+function escaparXml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+// Monta um .docx de verdade (é um zip com XML dentro).
+async function baixarDocx(texto, nome) {
+  await carregarBiblioteca('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  const zip = new JSZip();
+
+  zip.file('[Content_Types].xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+    '</Types>');
+
+  zip.folder('_rels').file('.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+    '</Relationships>');
+
+  const paragrafos = texto.split('\n').map(function (linha) {
+    const conteudo = linha.trim();
+    if (!conteudo) return '<w:p/>';
+    // Linha de tabela em markdown vira texto com separador legível
+    const limpo = ehLinhaDeTabela(conteudo) ? celulasDaLinha(conteudo).join('\t') : conteudo;
+    const titulo = /^#{1,6}\s/.test(conteudo);
+    const corpo = limpo.replace(/^#{1,6}\s*/, '').replace(/\*\*/g, '');
+    return '<w:p>' +
+      (titulo ? '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>' : '') +
+      '<w:r>' + (titulo ? '<w:rPr><w:b/><w:sz w:val="30"/></w:rPr>' : '') +
+      '<w:t xml:space="preserve">' + escaparXml(corpo) + '</w:t></w:r></w:p>';
+  }).join('');
+
+  zip.folder('word').file('document.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    '<w:body>' + paragrafos + '<w:sectPr/></w:body></w:document>');
+
+  const blob = await zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  });
+  return baixarBlob(blob, nome.replace(/\.[^.]+$/, '') + '.docx');
+}
+
+async function baixarPdf(texto, nome) {
+  await carregarBiblioteca('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  const Construtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+  if (!Construtor) throw new Error('biblioteca de PDF não carregou');
+
+  const doc = new Construtor({ unit: 'pt', format: 'a4' });
+  const margem = 56;
+  const largura = doc.internal.pageSize.getWidth() - margem * 2;
+  const alturaPagina = doc.internal.pageSize.getHeight() - margem;
+  let y = margem;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+
+  texto.split('\n').forEach(function (linha) {
+    const conteudo = ehLinhaDeTabela(linha) ? celulasDaLinha(linha).join('   ') : linha;
+    const titulo = /^#{1,6}\s/.test(linha);
+    const corpo = conteudo.replace(/^#{1,6}\s*/, '').replace(/\*\*/g, '');
+
+    doc.setFontSize(titulo ? 15 : 11);
+    doc.setFont('helvetica', titulo ? 'bold' : 'normal');
+
+    const pedacos = corpo ? doc.splitTextToSize(corpo, largura) : [''];
+    pedacos.forEach(function (p) {
+      if (y > alturaPagina) { doc.addPage(); y = margem; }
+      doc.text(p, margem, y);
+      y += titulo ? 22 : 16;
+    });
+  });
+
+  return baixarBlob(doc.output('blob'), nome.replace(/\.[^.]+$/, '') + '.pdf');
+}
+
+function baixarBlob(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+}
+
+// ── Montagem da resposta ──────────────────────────────────────────────────
+function despejarTexto(destino, linhas) {
+  const texto = linhas.join('\n').replace(/^\n+|\n+$/g, '');
+  if (!texto) return;
+  const p = document.createElement('span');
+  inserirComLinks(p, texto + '\n');
+  destino.appendChild(p);
+}
+
+function renderizarTextoETabelas(destino, texto) {
+  const linhas = texto.split('\n');
+  let acumulado = [];
+  let i = 0;
+  while (i < linhas.length) {
+    const proxima = linhas[i + 1];
+    if (ehLinhaDeTabela(linhas[i]) && proxima && ehSeparadorDeTabela(proxima)) {
+      despejarTexto(destino, acumulado);
+      acumulado = [];
+      const bloco = [];
+      while (i < linhas.length && ehLinhaDeTabela(linhas[i])) { bloco.push(linhas[i]); i++; }
+      destino.appendChild(criarTabela(bloco));
+    } else {
+      acumulado.push(linhas[i]);
+      i++;
+    }
+  }
+  despejarTexto(destino, acumulado);
+}
+
+function renderizarResposta(destino, texto) {
+  destino.textContent = '';
+  let posicao = 0;
+  REGEX_BLOCO_ARQUIVO.lastIndex = 0;
+  let achado;
+  while ((achado = REGEX_BLOCO_ARQUIVO.exec(texto)) !== null) {
+    if (achado.index > posicao) {
+      renderizarTextoETabelas(destino, texto.slice(posicao, achado.index));
+    }
+    destino.appendChild(criarCartaoArquivo(achado[1].trim(), achado[2]));
+    posicao = achado.index + achado[0].length;
+  }
+  if (posicao < texto.length) {
+    renderizarTextoETabelas(destino, texto.slice(posicao));
+  }
+  if (!destino.childNodes.length) destino.textContent = texto;
+}
+
+// Texto que a voz deve ler: sem o conteúdo dos arquivos nem marcação de tabela.
+function textoParaFala(texto) {
+  return String(texto)
+    .replace(REGEX_BLOCO_ARQUIVO, ' Arquivo $1 pronto para baixar. ')
+    .split('\n')
+    .filter(function (l) { return !ehSeparadorDeTabela(l); })
+    .map(function (l) { return ehLinhaDeTabela(l) ? celulasDaLinha(l).join(', ') : l; })
+    .join('\n');
 }
 
 </script>

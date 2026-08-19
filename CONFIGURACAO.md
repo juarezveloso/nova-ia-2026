@@ -157,3 +157,37 @@ naturais aparecem no seletor marcadas com ★.
 Onde encontrar mais vozes: no Android, em *Configurações → Idiomas → Saída de
 texto para voz*, dá para instalar vozes adicionais do Google. No Windows, em
 *Configurações → Hora e idioma → Fala*.
+
+## Gerar arquivos e links nas respostas
+
+As respostas da IA agora viram conteúdo interativo:
+
+- **Links** — endereços começando com `https://` viram links clicáveis.
+- **Tabelas** — tabelas em markdown aparecem formatadas, com botões
+  **⬇ Excel** e **⬇ CSV** logo abaixo.
+- **Arquivos** — quando você pede um arquivo, a IA responde com um bloco
+  ` ```arquivo:nome.xlsx ` e a página transforma isso num cartão com botão
+  de download e prévia do conteúdo.
+
+Formatos que a página sabe gerar:
+
+| Extensão | Como é montado |
+|---|---|
+| .xlsx | SheetJS, com largura de coluna ajustada |
+| .csv | separador `;` e BOM (o Excel abre os acentos certos) |
+| .docx | OOXML de verdade, montado com JSZip |
+| .pdf | jsPDF, com quebra de linha e paginação |
+| .txt | texto puro |
+
+Exemplos do que pedir: *"monte uma planilha com os materiais e preços"*,
+*"gere um relatório em Word sobre isso"*, *"exporte essa lista em CSV"*.
+
+Observações:
+
+- **Tudo é montado no navegador.** O arquivo não passa pelo Worker nem pela
+  internet — é criado no seu aparelho na hora que você clica em baixar. Isso
+  não consome nada da cota diária de IA.
+- As bibliotecas (SheetJS, JSZip, jsPDF) são carregadas só quando você baixa
+  um arquivo daquele tipo, para a página continuar leve.
+- **Links inventados:** o modelo é instruído a não chutar endereços, mas
+  nenhum modelo é perfeito nisso. Confira antes de confiar num link.
