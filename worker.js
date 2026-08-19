@@ -103,9 +103,67 @@ export default {
         '\n\n[...documento cortado por limite de tamanho...]';
     }
 
+    const fontes = [];
+
+    // Data e hora reais: sozinho, o modelo não sabe que dia é hoje.
+    messages.splice(sistema ? 1 : 0, 0, {
+      role: 'system',
+      content: 'Agora é ' + agoraNoBrasil() + '. Use esta data sempre que a pergunta ' +
+        'depender do tempo ("hoje", "atualmente", "este ano").\n' +
+        'Se a resposta exigir informação atual que você não possui (notícias, cotações, ' +
+        'preços, fatos recentes), responda APENAS com: BUSCAR: <termos>',
+    });
+
+    // Endereço na mensagem: lemos a página e entregamos o conteúdo ao modelo.
+    const enderecos = (alvo && alvo.content ? alvo.content.match(/https?:\/\/[^\s<>")]+/g) : null) || [];
+    if (enderecos.length) {
+      try {
+        const pagina = await comPrazo(lerPagina(enderecos[0]), PRAZO_BUSCA);
+        alvo.content = 'Conteúdo lido da página ' + pagina.url + ' ("' + pagina.titulo + '"):\n' +
+          pagina.texto + '\n\n---\nPergunta do usuário: ' + alvo.content;
+        fontes.push({ titulo: pagina.titulo, url: pagina.url });
+      } catch (e) { /* sem a página, segue com o que tem */ }
+    }
+
     try {
-      const resultado = await env.AI.run(MODELO, { messages, max_tokens: 1200 });
-      return jsonResponse({ reply: resultado.response || '' }, 200);
+      let resultado = await env.AI.run(MODELO, { messages, max_tokens: 1200 });
+      let resposta = resultado.response || '';
+
+      // O modelo pediu pesquisa: buscamos e perguntamos de novo com os dados.
+      const pedido = resposta.match(/BUSCAR:\s*(.+)/i);
+      if (pedido && alvo) {
+        const termos = pedido[1].split('\n')[0].trim().slice(0, 120);
+        const achado = await pesquisar(termos);
+        achado.fontes.forEach(function (f) { fontes.push(f); });
+
+        // Os dados vão DENTRO da pergunta. Entregues como aviso do sistema, o
+        // modelo os ignorava e repetia "não tenho acesso a informações em tempo real".
+        const perguntaOriginal = alvo.content;
+        alvo.content = achado.texto
+          ? 'Os dados abaixo foram consultados na internet agora (' + agoraNoBrasil() +
+            '). São reais, atuais e confiáveis.\n\n' + achado.texto +
+            '\n\n---\nUsando os dados acima, responda: ' + perguntaOriginal +
+            '\n\nCite os números e as datas encontrados. Nunca diga que não tem acesso a ' +
+            'informação em tempo real: os dados atuais estão logo acima.'
+          : 'A consulta à internet sobre "' + termos + '" não trouxe resultados.\n\n' +
+            'Responda com o que você sabe e avise que não conseguiu confirmar dados atuais.\n' +
+            'Pergunta: ' + perguntaOriginal;
+
+        resultado = await env.AI.run(MODELO, { messages, max_tokens: 1200 });
+        resposta = (resultado.response || '').replace(/BUSCAR:.*/gi, '').trim();
+
+        // Se os dados não serviram, o modelo às vezes devolve vazio: refazemos
+        // a pergunta original em vez de deixar o usuário sem resposta.
+        if (!resposta) {
+          alvo.content = perguntaOriginal;
+          resultado = await env.AI.run(MODELO, { messages, max_tokens: 1200 });
+          resposta = (resultado.response || '').replace(/BUSCAR:.*/gi, '').trim();
+        }
+      }
+
+      const saida = { reply: resposta, fontes: fontes };
+      if (body.debug) saida.contexto = alvo ? alvo.content.slice(0, 1200) : null;
+      return jsonResponse(saida, 200);
     } catch (e) {
       return jsonResponse({ error: { message: descreverErro(e) } }, 502);
     }
@@ -232,6 +290,277 @@ async function transcreverAudio(env, body) {
   }
 }
 
+// ── Informação em tempo real ──────────────────────────────────────────────
+// Todas as fontes abaixo são públicas e gratuitas: nenhuma exige chave.
+
+const FUSO = 'America/Sao_Paulo';
+const PRAZO_BUSCA = 6000;   // ms por fonte: uma fonte lenta não trava a resposta
+
+function agoraNoBrasil() {
+  const agora = new Date();
+  try {
+    const data = agora.toLocaleDateString('pt-BR', {
+      timeZone: FUSO, weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+    });
+    const hora = agora.toLocaleTimeString('pt-BR', {
+      timeZone: FUSO, hour: '2-digit', minute: '2-digit',
+    });
+    return data + ' às ' + hora + ' (horário de Brasília)';
+  } catch (e) {
+    return agora.toISOString();
+  }
+}
+
+function comPrazo(promessa, ms) {
+  return Promise.race([
+    promessa,
+    new Promise(function (_, rejeitar) {
+      setTimeout(function () { rejeitar(new Error('tempo esgotado')); }, ms);
+    }),
+  ]);
+}
+
+function limparTags(s) {
+  return String(s)
+    .replace(/<!\[CDATA\[|\]\]>/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&#(d+);/g, function (_, n) { return String.fromCharCode(Number(n)); })
+    .replace(/&#x([0-9a-fA-F]+);/g, function (_, n) { return String.fromCharCode(parseInt(n, 16)); })
+    .replace(/\s+/g, ' ').trim();
+}
+
+// Notícias. O Google Notícias responde 503 aos IPs da Cloudflare, então usamos
+// o Bing (que aceita busca por termos) e, como reserva, feeds brasileiros
+// filtrados pelas palavras da pergunta.
+const FEEDS_BRASIL = [
+  'https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml',
+  'https://g1.globo.com/rss/g1/',
+];
+
+function semAcento(s) {
+  return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function extrairItens(xml, limite) {
+  const itens = [];
+  const regex = /<item>([\s\S]*?)<\/item>/g;
+  let bloco;
+  while ((bloco = regex.exec(xml)) !== null && itens.length < limite) {
+    const corpo = bloco[1];
+    const t = corpo.match(/<title>([\s\S]*?)<\/title>/);
+    const l = corpo.match(/<link>([\s\S]*?)<\/link>/);
+    const p = corpo.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+    if (!t) continue;
+    itens.push({
+      titulo: limparTags(t[1]),
+      url: l ? limparTags(l[1]) : '',
+      data: p ? limparTags(p[1]).slice(0, 22) : '',
+    });
+  }
+  return itens;
+}
+
+function filtrarPorTermos(itens, termos) {
+  const palavras = semAcento(termos).split(/[^a-z0-9]+/)
+    .filter(function (p) { return p.length > 3; });
+  if (!palavras.length) return itens;
+  return itens.filter(function (it) {
+    const alvo = semAcento(it.titulo);
+    return palavras.some(function (p) { return alvo.indexOf(p) !== -1; });
+  });
+}
+
+async function buscarNoticias(termos) {
+  // 1ª opção: busca por termos no Bing Notícias
+  try {
+    const url = 'https://www.bing.com/news/search?q=' + encodeURIComponent(termos) +
+      '&format=RSS&cc=br&setlang=pt-BR';
+    const r = await fetch(url, { headers: { 'User-Agent': 'NovaIA2026/1.0' } });
+    if (r.ok) {
+      const itens = extrairItens(await r.text(), 6);
+      if (itens.length) return itens;
+    }
+  } catch (e) { /* cai para os feeds brasileiros */ }
+
+  // 2ª opção: feeds brasileiros filtrados pelas palavras da pergunta
+  const respostas = await Promise.all(FEEDS_BRASIL.map(function (endereco) {
+    return comPrazo(fetch(endereco, { headers: { 'User-Agent': 'NovaIA2026/1.0' } })
+      .then(function (r) { return r.ok ? r.text() : ''; }), PRAZO_BUSCA)
+      .catch(function () { return ''; });
+  }));
+
+  let todos = [];
+  respostas.forEach(function (xml) {
+    if (xml) todos = todos.concat(extrairItens(xml, 40));
+  });
+
+  const filtrados = filtrarPorTermos(todos, termos);
+  return (filtrados.length ? filtrados : todos).slice(0, 6);
+}
+// Resumo enciclopédico (Wikipédia em português)
+async function buscarWikipedia(termos) {
+  const busca = 'https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+    encodeURIComponent(termos) + '&format=json&srlimit=1&origin=*';
+  const r = await fetch(busca, { headers: { 'User-Agent': 'NovaIA2026/1.0' } });
+  const d = await r.json();
+  const primeiro = d && d.query && d.query.search && d.query.search[0];
+  if (!primeiro) return null;
+
+  const titulo = primeiro.title;
+  const endereco = 'https://pt.wikipedia.org/wiki/' + encodeURIComponent(titulo.replace(/ /g, '_'));
+  try {
+    const resumo = await fetch('https://pt.wikipedia.org/api/rest_v1/page/summary/' +
+      encodeURIComponent(titulo.replace(/ /g, '_')),
+      { headers: { 'User-Agent': 'NovaIA2026/1.0' } });
+    const rd = await resumo.json();
+    return { titulo: titulo, texto: (rd.extract || '').slice(0, 900), url: endereco };
+  } catch (e) {
+    return { titulo: titulo, texto: limparTags(primeiro.snippet), url: endereco };
+  }
+}
+
+// Cotações de moedas em tempo real
+// Cotações. A AwesomeAPI foi descartada: dos IPs da Cloudflare ela responde
+// 429 (cota compartilhada estourada). Usamos o Banco Central como fonte
+// oficial e fontes internacionais como reserva.
+async function pegarJson(url) {
+  const r = await fetch(url, { headers: { 'User-Agent': 'NovaIA2026/1.0' } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);   // sem isto, um erro vira dado vazio
+  return await r.json();
+}
+
+function dataParaPtax(d) {
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return mm + '-' + dd + '-' + d.getUTCFullYear();
+}
+
+// Dólar oficial (PTAX do Banco Central), buscando os últimos dias úteis
+async function cotacaoBancoCentral() {
+  const hoje = new Date();
+  const inicio = new Date(hoje.getTime() - 7 * 24 * 3600 * 1000);
+  const url = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/' +
+    'CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)' +
+    '?@dataInicial=%27' + dataParaPtax(inicio) + '%27' +
+    '&@dataFinalCotacao=%27' + dataParaPtax(hoje) + '%27' +
+    '&$top=1&$orderby=dataHoraCotacao%20desc&$format=json';
+  const d = await pegarJson(url);
+  const c = d && d.value && d.value[0];
+  if (!c || !c.cotacaoVenda) throw new Error('sem cotação do BC');
+  return {
+    nome: 'Dólar (PTAX oficial do Banco Central)',
+    valor: Number(c.cotacaoVenda).toFixed(4),
+    quando: String(c.dataHoraCotacao).slice(0, 19),
+  };
+}
+
+// Dólar e euro por fontes internacionais (reserva)
+async function cotacaoInternacional() {
+  try {
+    const d = await pegarJson('https://api.frankfurter.app/latest?from=USD&to=BRL,EUR');
+    const saida = [];
+    if (d.rates && d.rates.BRL) {
+      saida.push({ nome: 'Dólar americano', valor: Number(d.rates.BRL).toFixed(4), quando: d.date });
+    }
+    if (d.rates && d.rates.BRL && d.rates.EUR) {
+      saida.push({
+        nome: 'Euro',
+        valor: (Number(d.rates.BRL) / Number(d.rates.EUR)).toFixed(4),
+        quando: d.date,
+      });
+    }
+    if (saida.length) return saida;
+    throw new Error('sem taxas');
+  } catch (e) {
+    const d = await pegarJson('https://open.er-api.com/v6/latest/USD');
+    if (!d.rates || !d.rates.BRL) throw new Error('sem taxas');
+    return [{
+      nome: 'Dólar americano',
+      valor: Number(d.rates.BRL).toFixed(4),
+      quando: d.time_last_update_utc || '',
+    }];
+  }
+}
+
+async function cotacaoBitcoin() {
+  const d = await pegarJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl');
+  if (!d.bitcoin || !d.bitcoin.brl) throw new Error('sem bitcoin');
+  return { nome: 'Bitcoin', valor: Number(d.bitcoin.brl).toLocaleString('pt-BR'), quando: 'agora' };
+}
+
+async function buscarCotacoes(termos) {
+  const querBitcoin = /bitcoin|btc|cripto/i.test(termos || '');
+  const r = await Promise.all([
+    comPrazo(cotacaoBancoCentral(), PRAZO_BUSCA).catch(function () { return null; }),
+    comPrazo(cotacaoInternacional(), PRAZO_BUSCA).catch(function () { return null; }),
+    querBitcoin ? comPrazo(cotacaoBitcoin(), PRAZO_BUSCA).catch(function () { return null; })
+                : Promise.resolve(null),
+  ]);
+  const lista = [];
+  if (r[0]) lista.push(r[0]);
+  if (r[1]) r[1].forEach(function (c) { lista.push(c); });
+  if (r[2]) lista.push(r[2]);
+  if (!lista.length) throw new Error('nenhuma fonte de cotação respondeu');
+  return lista;
+}
+// Lê uma página da web e devolve o texto principal
+async function lerPagina(endereco) {
+  const r = await fetch(endereco, { headers: { 'User-Agent': 'NovaIA2026/1.0' } });
+  if (!r.ok) throw new Error('status ' + r.status);
+  const tipo = r.headers.get('content-type') || '';
+  if (tipo.indexOf('text/') === -1 && tipo.indexOf('json') === -1) {
+    throw new Error('conteúdo não textual');
+  }
+  let html = await r.text();
+  html = html.replace(/<script[\s\S]*?<\/script>/gi, ' ')
+             .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+             .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+             .replace(/<footer[\s\S]*?<\/footer>/gi, ' ');
+  const achadoTitulo = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return {
+    titulo: limparTags(achadoTitulo ? achadoTitulo[1] : endereco),
+    texto: limparTags(html).slice(0, 6000),
+    url: endereco,
+  };
+}
+
+// Consulta as fontes em paralelo e monta um bloco de contexto
+async function pesquisar(termos) {
+  const fontes = [];
+  const partes = [];
+
+  const querCotacao = /d[óo]lar|euro|c[âa]mbio|cota[çc][ãa]o|bitcoin|moeda/i.test(termos);
+  const resultados = await Promise.all([
+    comPrazo(buscarNoticias(termos), PRAZO_BUSCA).catch(function () { return null; }),
+    /not[íi]cia|recente|[úu]ltimas|hoje|agora|atual/i.test(termos)
+      ? Promise.resolve(null)   // pergunta de notícia: enciclopédia só atrapalha
+      : comPrazo(buscarWikipedia(termos), PRAZO_BUSCA).catch(function () { return null; }),
+    querCotacao ? comPrazo(buscarCotacoes(termos), PRAZO_BUSCA).catch(function () { return null; })
+                : Promise.resolve(null),
+  ]);
+  const noticias = resultados[0], wiki = resultados[1], moedas = resultados[2];
+
+  if (moedas && moedas.length) {
+    partes.push('COTAÇÕES NESTE MOMENTO:\n' + moedas.map(function (c) {
+      return '- ' + c.nome + ': R$ ' + c.valor + ' (medido em ' + c.quando + ')';
+    }).join('\n'));
+    fontes.push({ titulo: 'Cotações em tempo real', url: 'https://economia.awesomeapi.com.br' });
+  }
+  if (noticias && noticias.length) {
+    partes.push('NOTÍCIAS RECENTES:\n' + noticias.map(function (n) {
+      return '- ' + n.titulo + ' [publicado em ' + n.data + ']';
+    }).join('\n'));
+    noticias.slice(0, 4).forEach(function (n) { fontes.push({ titulo: n.titulo, url: n.url }); });
+  }
+  if (wiki && wiki.texto) {
+    partes.push('ENCICLOPÉDIA (' + wiki.titulo + '):\n' + wiki.texto);
+    fontes.push({ titulo: 'Wikipédia: ' + wiki.titulo, url: wiki.url });
+  }
+
+  return { texto: partes.join('\n\n'), fontes: fontes };
+}
 function descreverErro(e) {
   const msg = e && e.message ? e.message : String(e);
   if (/capacity|limit|quota|exceed|429/i.test(msg)) {
