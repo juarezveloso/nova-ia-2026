@@ -415,6 +415,17 @@
     text-align: center;
     margin-bottom: 8px;
   }
+
+  #log-voz {
+    display: none;
+    position: fixed; right: 12px; top: 12px; z-index: 200;
+    width: 360px; max-height: 45vh; overflow-y: auto;
+    background: rgba(0,0,0,0.88); border: 1px solid var(--accent);
+    border-radius: 10px; padding: 10px;
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    color: #9fe8ff; line-height: 1.5; white-space: pre-wrap;
+  }
+  #log-voz.ativo { display: block; }
 </style>
 </head>
 <body>
@@ -443,6 +454,8 @@
 Como posso te ajudar hoje?</div>
   </div>
 </div>
+
+<pre id="log-voz"></pre>
 
 <div id="dropzone">Solte os arquivos aqui para analisar 📄</div>
 
@@ -938,8 +951,63 @@ let reconhecedor = null;
 let gravador = null;
 let fluxoAudio = null;
 let pedacosAudio = [];
-let textoAntesDaFala = '';
-let trechosFinais = '';
+
+// Estado da fala. Separar em três partes evita somar o mesmo trecho duas vezes:
+let idSessaoVoz = 0;   // invalida eventos de reconhecedores já descartados
+let textoBase = '';    // o que já estava digitado antes de você falar
+let textoFalado = '';  // tudo que foi reconhecido nas sessões já encerradas
+let textoSessao = '';  // o que a sessão de escuta atual reconheceu
+let depurarVoz = false;
+
+function limparEspacos(s) {
+  return (s || '').replace(/\s+/g, ' ').trim();
+}
+
+// Junta dois trechos ignorando repetição. O navegador às vezes reprocessa o
+// fim do áudio ao reiniciar a escuta, reenviando o que já tinha reconhecido —
+// sem isto, a mesma frase aparecia 2 ou 3 vezes.
+function juntarSemRepetir(base, novo) {
+  base = limparEspacos(base);
+  novo = limparEspacos(novo);
+  if (!base) return novo;
+  if (!novo) return base;
+
+  const b = base.toLowerCase();
+  const n = novo.toLowerCase();
+
+  // O trecho novo já está inteiro no fim do que temos: é reenvio, descarta.
+  if (n.length >= 5 && b.slice(-n.length) === n) return base;
+
+  // Sobreposição parcial: acha o maior fim de "base" que é começo de "novo".
+  const limite = Math.min(b.length, n.length);
+  for (let k = limite; k >= 6; k--) {
+    if (b.slice(b.length - k) === n.slice(0, k)) {
+      return limparEspacos(base + novo.slice(k));
+    }
+  }
+  return base + ' ' + novo;
+}
+
+function textoCompletoDaFala() {
+  return juntarSemRepetir(textoFalado, textoSessao);
+}
+
+function atualizarCampoDeTexto() {
+  const input = document.getElementById('user-input');
+  input.value = textoBase + textoCompletoDaFala();
+  autoResize(input);
+}
+
+function registrarVoz(rotulo, detalhe) {
+  if (!depurarVoz) return;
+  const painel = document.getElementById('log-voz');
+  if (!painel) return;
+  const linha = document.createElement('div');
+  const hora = new Date().toISOString().slice(14, 23);
+  linha.textContent = hora + '  ' + rotulo + (detalhe ? '  ' + detalhe : '');
+  painel.appendChild(linha);
+  painel.scrollTop = painel.scrollHeight;
+}
 
 function mostrarStatusVoz(texto) {
   const el = document.getElementById('status-voz');
@@ -973,7 +1041,9 @@ function iniciarVoz() {
 
 function pararVoz(jaEncerrou) {
   ouvindo = false;
+  idSessaoVoz++; // qualquer evento atrasado do reconhecedor antigo é ignorado
   marcarBotaoVoz(false);
+  registrarVoz('PAROU');
 
   if (reconhecedor) {
     try { if (!jaEncerrou) reconhecedor.stop(); } catch (e) {}
@@ -990,44 +1060,48 @@ function pararVoz(jaEncerrou) {
 
 // Caminho 1: reconhecimento nativo do navegador
 function iniciarReconhecimentoNativo() {
-  // Se sobrou um reconhecedor anterior, encerra antes de abrir outro.
   if (reconhecedor) { try { reconhecedor.abort(); } catch (erro) {} reconhecedor = null; }
+
+  const meuId = ++idSessaoVoz;
+  const input = document.getElementById('user-input');
+
+  textoBase = input.value.trim() ? input.value.trim() + ' ' : '';
+  textoFalado = '';
+  textoSessao = '';
+  let reinicios = 0;
 
   reconhecedor = new RECONHECIMENTO_NATIVO();
   reconhecedor.lang = 'pt-BR';
   reconhecedor.continuous = true;
   reconhecedor.interimResults = true;
 
-  const input = document.getElementById('user-input');
-  textoAntesDaFala = input.value.trim() ? input.value.trim() + ' ' : '';
-  trechosFinais = '';
-  let reinicios = 0;
-
-  // Reconstrói o texto inteiro a cada evento em vez de somar pedaços.
-  // O navegador reenvia trechos já finalizados, e somar com += fazia a
-  // mesma frase aparecer 2 ou 3 vezes.
+  // Reconstrói o texto da sessão do zero a cada evento (nunca soma pedaços),
+  // porque o navegador reenvia trechos já finalizados no mesmo evento.
   reconhecedor.onresult = function (e) {
+    if (meuId !== idSessaoVoz) return; // evento de uma sessão já descartada
+
     let finais = '';
     let parcial = '';
     for (let i = 0; i < e.results.length; i++) {
       const trecho = e.results[i][0].transcript;
-      if (e.results[i].isFinal) finais += trecho;
-      else parcial += trecho;
+      if (e.results[i].isFinal) finais += trecho + ' ';
+      else parcial += trecho + ' ';
     }
-    trechosFinais = finais;
-    const falado = (finais + ' ' + parcial).replace(/\s+/g, ' ').trim();
-    input.value = textoAntesDaFala + falado;
-    autoResize(input);
+    textoSessao = limparEspacos(finais + parcial);
+    registrarVoz('RESULTADO', '(' + e.results.length + ' trechos) "' + textoSessao + '"');
+    atualizarCampoDeTexto();
   };
 
   reconhecedor.onerror = function (e) {
+    if (meuId !== idSessaoVoz) return;
+    registrarVoz('ERRO', e.error);
+
     // Silêncio curto ou parada normal não são erros: o onend recomeça sozinho.
     if (e.error === 'no-speech' || e.error === 'aborted') return;
 
     const motivos = {
       'not-allowed': 'Permissão do microfone negada — libere nas configurações do navegador',
       'service-not-allowed': 'O navegador bloqueou o reconhecimento de voz',
-      'no-speech': 'Não ouvi nada. Tente de novo.',
       'audio-capture': 'Nenhum microfone encontrado',
       'network': 'Sem conexão para o reconhecimento de voz',
     };
@@ -1037,14 +1111,13 @@ function iniciarReconhecimentoNativo() {
   };
 
   reconhecedor.onend = function () {
-    if (!ouvindo) return; // o usuário mandou parar: nada a fazer
+    if (meuId !== idSessaoVoz || !ouvindo) return;
 
-    // O navegador encerra a escuta sozinho após alguns segundos de silêncio.
-    // Como o usuário não pediu para parar, recomeçamos — guardando o que já
-    // foi dito, porque a nova sessão começa com a lista de resultados vazia.
-    const jaDito = (textoAntesDaFala + ' ' + trechosFinais).replace(/\s+/g, ' ').trim();
-    textoAntesDaFala = jaDito ? jaDito + ' ' : '';
-    trechosFinais = '';
+    // O navegador encerra a escuta sozinho depois de um silêncio. Guardamos o
+    // que a sessão reconheceu (sem repetir) e recomeçamos a ouvir.
+    textoFalado = juntarSemRepetir(textoFalado, textoSessao);
+    textoSessao = '';
+    registrarVoz('FIM DA SESSÃO', 'acumulado: "' + textoFalado + '"');
 
     reinicios++;
     if (reinicios > 40) { // trava de segurança contra laço infinito
@@ -1054,6 +1127,7 @@ function iniciarReconhecimentoNativo() {
     }
     try {
       reconhecedor.start();
+      registrarVoz('REINICIOU', 'nº ' + reinicios);
     } catch (erro) {
       mostrarStatusVoz('');
       pararVoz(true);
@@ -1062,6 +1136,7 @@ function iniciarReconhecimentoNativo() {
 
   try {
     reconhecedor.start();
+    registrarVoz('INICIOU');
   } catch (e) {
     mostrarStatusVoz('Não consegui iniciar o microfone');
     setTimeout(function () { mostrarStatusVoz(''); }, 3000);
@@ -1189,6 +1264,13 @@ if (!RECONHECIMENTO_NATIVO && !PODE_GRAVAR) {
   document.getElementById('mic-btn').style.display = 'none';
 }
 
+
+// Painel de diagnóstico da voz: abra o site com ?debug=voz no fim do endereço
+if (location.search.indexOf('debug=voz') !== -1) {
+  depurarVoz = true;
+  document.getElementById('log-voz').classList.add('ativo');
+  registrarVoz('DIAGNÓSTICO LIGADO', navigator.userAgent.slice(0, 60));
+}
 </script>
 </body>
 </html>
