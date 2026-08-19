@@ -65,6 +65,11 @@ export default {
     const historico = Array.isArray(body.messages) ? body.messages : [];
     const sistema = typeof body.system === 'string' ? body.system : '';
 
+    // ── Caminho 0: áudio enviado → transcrição (voz para texto) ──────────────
+    if (typeof body.audio === 'string' && body.audio) {
+      return await transcreverAudio(env, body);
+    }
+
     // ── Caminho 1: imagem anexada → modelo de visão ──────────────────────────
     if (typeof body.image === 'string' && body.image) {
       return await analisarImagem(env, body, sistema);
@@ -198,6 +203,33 @@ function html(titulo, corpo) {
 
 function escaparHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Transcreve áudio gravado pelo visitante (usado quando o navegador não tem
+// reconhecimento de voz nativo). Tenta o Whisper turbo e cai para o básico.
+async function transcreverAudio(env, body) {
+  try {
+    const r = await env.AI.run('@cf/openai/whisper-large-v3-turbo', {
+      audio: body.audio,
+      task: 'transcribe',
+      language: 'pt',
+    });
+    if (r && typeof r.text === 'string') {
+      return jsonResponse({ texto: r.text.trim(), modelo: 'whisper-large-v3-turbo' }, 200);
+    }
+  } catch (e) {
+    // segue para o modelo básico
+  }
+
+  try {
+    const binario = atob(body.audio);
+    const bytes = new Array(binario.length);
+    for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+    const r = await env.AI.run('@cf/openai/whisper', { audio: bytes });
+    return jsonResponse({ texto: (r && r.text ? r.text : '').trim(), modelo: 'whisper' }, 200);
+  } catch (e) {
+    return jsonResponse({ error: { message: descreverErro(e) } }, 502);
+  }
 }
 
 function descreverErro(e) {

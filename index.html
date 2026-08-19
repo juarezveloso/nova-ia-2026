@@ -383,6 +383,38 @@
     text-align: center; padding: 24px;
   }
   #dropzone.ativo { display: flex; }
+
+  /* ── Microfone ──────────────────────────────────────────── */
+  #mic-btn {
+    background: transparent; border: none; padding: 0;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 8px; flex-shrink: 0;
+    transition: background 0.2s; position: relative;
+  }
+  #mic-btn:hover { background: rgba(108,99,255,0.15); }
+  #mic-btn svg { width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.2s; }
+  #mic-btn:hover svg { stroke: var(--accent2); }
+  #mic-btn.gravando { background: rgba(255,80,80,0.18); }
+  #mic-btn.gravando svg { stroke: #ff5a5a; }
+  #mic-btn.gravando::after {
+    content: ''; position: absolute; inset: -2px;
+    border-radius: 10px; border: 1px solid rgba(255,90,90,0.6);
+    animation: pulso-mic 1.2s ease-in-out infinite;
+  }
+  @keyframes pulso-mic {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.12); }
+  }
+
+  #status-voz {
+    display: none;
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    color: var(--accent2);
+    text-align: center;
+    margin-bottom: 8px;
+  }
 </style>
 </head>
 <body>
@@ -415,9 +447,13 @@ Como posso te ajudar hoje?</div>
 <div id="dropzone">Solte os arquivos aqui para analisar 📄</div>
 
 <div id="input-area">
+  <div id="status-voz"></div>
   <div id="attachments"></div>
   <div class="input-wrapper">
     <input type="file" id="file-input" multiple hidden>
+    <button id="mic-btn" onclick="alternarVoz()" title="Falar em vez de digitar">
+      <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
     <button id="attach-btn" onclick="document.getElementById('file-input').click()" title="Anexar documento ou imagem">
       <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
     </button>
@@ -426,7 +462,7 @@ Como posso te ajudar hoje?</div>
       <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
   </div>
-  <p class="hint">Enter para enviar • Shift+Enter para nova linha • 📎 anexe PDF, Word, Excel, imagens…</p>
+  <p class="hint">Enter para enviar • Shift+Enter para nova linha • 🎤 fale • 📎 anexe PDF, Word, Excel, imagens</p>
 </div>
 
 <script>
@@ -888,6 +924,240 @@ document.getElementById('user-input').addEventListener('paste', function (e) {
   const arquivos = e.clipboardData && e.clipboardData.files ? Array.from(e.clipboardData.files) : [];
   if (arquivos.length) { e.preventDefault(); adicionarArquivos(arquivos); }
 });
+
+
+// ── Entrada por voz ───────────────────────────────────────────────────────
+// Usa o reconhecimento nativo do navegador quando existe (instantâneo, mostra
+// o texto enquanto você fala e não gasta cota). Quando não existe (Firefox),
+// grava o áudio e manda para o Whisper no Worker.
+const RECONHECIMENTO_NATIVO = window.SpeechRecognition || window.webkitSpeechRecognition;
+const PODE_GRAVAR = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+
+let ouvindo = false;
+let reconhecedor = null;
+let gravador = null;
+let fluxoAudio = null;
+let pedacosAudio = [];
+let textoAntesDaFala = '';
+let trechosFinais = '';
+
+function mostrarStatusVoz(texto) {
+  const el = document.getElementById('status-voz');
+  el.textContent = texto || '';
+  el.style.display = texto ? 'block' : 'none';
+}
+
+function marcarBotaoVoz(ativo) {
+  const btn = document.getElementById('mic-btn');
+  if (ativo) btn.classList.add('gravando');
+  else btn.classList.remove('gravando');
+  btn.title = ativo ? 'Parar de gravar' : 'Falar em vez de digitar';
+}
+
+function alternarVoz() {
+  if (ouvindo) pararVoz();
+  else iniciarVoz();
+}
+
+function iniciarVoz() {
+  ouvindo = true;
+  marcarBotaoVoz(true);
+  if (RECONHECIMENTO_NATIVO) {
+    mostrarStatusVoz('🎤 Ouvindo… pode falar');
+    iniciarReconhecimentoNativo();
+  } else {
+    mostrarStatusVoz('🎤 Gravando… clique no microfone para parar');
+    iniciarGravacao();
+  }
+}
+
+function pararVoz(jaEncerrou) {
+  ouvindo = false;
+  marcarBotaoVoz(false);
+
+  if (reconhecedor) {
+    try { if (!jaEncerrou) reconhecedor.stop(); } catch (e) {}
+    reconhecedor = null;
+    if (!jaEncerrou) mostrarStatusVoz('');
+  }
+  if (gravador && gravador.state === 'recording') {
+    gravador.stop(); // dispara a transcrição
+  } else if (!RECONHECIMENTO_NATIVO) {
+    mostrarStatusVoz('');
+  }
+  document.getElementById('user-input').focus();
+}
+
+// Caminho 1: reconhecimento nativo do navegador
+function iniciarReconhecimentoNativo() {
+  reconhecedor = new RECONHECIMENTO_NATIVO();
+  reconhecedor.lang = 'pt-BR';
+  reconhecedor.continuous = true;
+  reconhecedor.interimResults = true;
+
+  const input = document.getElementById('user-input');
+  textoAntesDaFala = input.value.trim() ? input.value.trim() + ' ' : '';
+  trechosFinais = '';
+
+  reconhecedor.onresult = function (e) {
+    let parcial = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const trecho = e.results[i][0].transcript;
+      if (e.results[i].isFinal) trechosFinais += trecho;
+      else parcial += trecho;
+    }
+    input.value = textoAntesDaFala + trechosFinais + parcial;
+    autoResize(input);
+  };
+
+  reconhecedor.onerror = function (e) {
+    const motivos = {
+      'not-allowed': 'Permissão do microfone negada — libere nas configurações do navegador',
+      'service-not-allowed': 'O navegador bloqueou o reconhecimento de voz',
+      'no-speech': 'Não ouvi nada. Tente de novo.',
+      'audio-capture': 'Nenhum microfone encontrado',
+      'network': 'Sem conexão para o reconhecimento de voz',
+    };
+    mostrarStatusVoz(motivos[e.error] || ('Erro no reconhecimento: ' + e.error));
+    setTimeout(function () { mostrarStatusVoz(''); }, 3500);
+    pararVoz(true);
+  };
+
+  reconhecedor.onend = function () {
+    if (ouvindo) { // encerrou sozinho (silêncio prolongado)
+      mostrarStatusVoz('');
+      pararVoz(true);
+    }
+  };
+
+  try {
+    reconhecedor.start();
+  } catch (e) {
+    mostrarStatusVoz('Não consegui iniciar o microfone');
+    setTimeout(function () { mostrarStatusVoz(''); }, 3000);
+    pararVoz(true);
+  }
+}
+
+// Caminho 2: grava e transcreve pelo Whisper no Worker
+async function iniciarGravacao() {
+  try {
+    fluxoAudio = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    mostrarStatusVoz('Permissão do microfone negada');
+    setTimeout(function () { mostrarStatusVoz(''); }, 3500);
+    pararVoz(true);
+    return;
+  }
+  pedacosAudio = [];
+  gravador = new MediaRecorder(fluxoAudio);
+  gravador.ondataavailable = function (e) { if (e.data && e.data.size) pedacosAudio.push(e.data); };
+  gravador.onstop = transcreverGravacao;
+  gravador.start();
+}
+
+async function transcreverGravacao() {
+  if (fluxoAudio) {
+    fluxoAudio.getTracks().forEach(function (t) { t.stop(); });
+    fluxoAudio = null;
+  }
+  const tipo = gravador && gravador.mimeType ? gravador.mimeType : 'audio/webm';
+  gravador = null;
+
+  if (!pedacosAudio.length) { mostrarStatusVoz(''); return; }
+
+  mostrarStatusVoz('⏳ Transcrevendo…');
+  try {
+    const base64 = await blobParaWavBase64(new Blob(pedacosAudio, { type: tipo }));
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio: base64 })
+    });
+    const d = await res.json();
+    if (!res.ok || !d.texto) {
+      mostrarStatusVoz('Não consegui entender o áudio. Tente de novo.');
+      setTimeout(function () { mostrarStatusVoz(''); }, 3500);
+      return;
+    }
+    const input = document.getElementById('user-input');
+    input.value = (input.value.trim() ? input.value.trim() + ' ' : '') + d.texto;
+    autoResize(input);
+    input.focus();
+    mostrarStatusVoz('');
+  } catch (e) {
+    mostrarStatusVoz('Falha ao transcrever o áudio');
+    setTimeout(function () { mostrarStatusVoz(''); }, 3500);
+  }
+}
+
+// Converte o áudio gravado para WAV 16 kHz mono (formato que o Whisper lê bem)
+async function blobParaWavBase64(blob) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
+    return arrayBufferParaBase64(codificarWav(audio, 16000));
+  } finally {
+    ctx.close();
+  }
+}
+
+function codificarWav(audioBuffer, taxaAlvo) {
+  const canais = audioBuffer.numberOfChannels;
+  let mono;
+  if (canais > 1) {
+    mono = new Float32Array(audioBuffer.length);
+    for (let c = 0; c < canais; c++) {
+      const dados = audioBuffer.getChannelData(c);
+      for (let i = 0; i < dados.length; i++) mono[i] += dados[i] / canais;
+    }
+  } else {
+    mono = audioBuffer.getChannelData(0);
+  }
+
+  const razao = audioBuffer.sampleRate / taxaAlvo;
+  const total = Math.floor(mono.length / razao);
+  const buffer = new ArrayBuffer(44 + total * 2);
+  const dv = new DataView(buffer);
+  const escrever = function (pos, s) {
+    for (let i = 0; i < s.length; i++) dv.setUint8(pos + i, s.charCodeAt(i));
+  };
+
+  escrever(0, 'RIFF');
+  dv.setUint32(4, 36 + total * 2, true);
+  escrever(8, 'WAVE');
+  escrever(12, 'fmt ');
+  dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true);
+  dv.setUint16(22, 1, true);
+  dv.setUint32(24, taxaAlvo, true);
+  dv.setUint32(28, taxaAlvo * 2, true);
+  dv.setUint16(32, 2, true);
+  dv.setUint16(34, 16, true);
+  escrever(36, 'data');
+  dv.setUint32(40, total * 2, true);
+
+  for (let i = 0; i < total; i++) {
+    const v = Math.max(-1, Math.min(1, mono[Math.floor(i * razao)]));
+    dv.setInt16(44 + i * 2, v * 0x7fff, true);
+  }
+  return buffer;
+}
+
+function arrayBufferParaBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binario = '';
+  const passo = 8192;
+  for (let i = 0; i < bytes.length; i += passo) {
+    binario += String.fromCharCode.apply(null, bytes.subarray(i, i + passo));
+  }
+  return btoa(binario);
+}
+
+// Esconde o microfone se o navegador não oferece nenhum dos dois caminhos
+if (!RECONHECIMENTO_NATIVO && !PODE_GRAVAR) {
+  document.getElementById('mic-btn').style.display = 'none';
+}
 
 </script>
 </body>
