@@ -501,7 +501,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.5</div>
+  <div class="badge">v2026.7</div>
 </header>
 
 
@@ -1370,8 +1370,15 @@ let vozesPortugues = [];
 // escolher automaticamente uma voz feminina.
 const VOZES_FEMININAS = ['luciana', 'maria', 'francisca', 'joana', 'fernanda',
   'camila', 'vitoria', 'vitória', 'helena', 'ana ', 'female', 'feminin', 'mulher'];
+// Marcas que indicam voz NATURAL (neural). São muito menos robóticas que as
+// vozes locais antigas, que usam síntese por concatenação.
+const VOZES_NATURAIS = ['natural', 'neural', 'online', 'wavenet', 'premium',
+  'enhanced', 'aprimorada', 'siri', 'eloquence'];
+
 const VOZES_MASCULINAS = ['daniel', 'felipe', 'ricardo', 'joao', 'joão', 'helio',
-  'hélio', 'eddy', 'male', 'masculin', 'homem'];
+  'hélio', 'eddy', 'antonio', 'antônio', 'thiago', 'tiago', 'carlos', 'paulo',
+  'marcos', 'julio', 'júlio', 'fabio', 'fábio', 'bruno', 'eduardo', 'leonardo',
+  'humberto', 'duarte', 'male', 'masculin', 'homem'];
 
 // O localStorage lança erro quando o armazenamento está bloqueado
 // (navegação privativa, por exemplo). Estas funções nunca quebram a página.
@@ -1390,15 +1397,46 @@ function contemAlgum(texto, lista) {
 }
 
 // Quanto maior a nota, melhor a voz para o nosso caso.
+// Quanto maior a nota, melhor a voz. Duas coisas pesam: ser feminina e ser
+// natural (neural). As vozes locais antigas soam robóticas, então perdem
+// para as neurais, que o navegador costuma marcar como "online"/"natural".
 function notaDaVoz(v) {
   const nome = (v.name || '').toLowerCase();
   let nota = 0;
-  if (/pt[-_]?br/i.test(v.lang)) nota += 10;      // português do Brasil primeiro
-  if (contemAlgum(nome, VOZES_FEMININAS)) nota += 20;
-  if (contemAlgum(nome, VOZES_MASCULINAS)) nota -= 30;
-  if (nome.indexOf('google') !== -1) nota += 5;   // no Chrome/Android é feminina
-  if (v.localService) nota += 2;                  // instalada no aparelho: mais rápida
+
+  if (/pt[-_]?br/i.test(v.lang)) nota += 10;             // português do Brasil primeiro
+  if (contemAlgum(nome, VOZES_FEMININAS)) nota += 25;    // queremos voz feminina
+  if (contemAlgum(nome, VOZES_MASCULINAS)) nota -= 40;
+  if (contemAlgum(nome, VOZES_NATURAIS)) nota += 30;     // qualidade natural
+  if (nome.indexOf('google') !== -1) nota += 15;         // as do Google soam bem melhor
+  if (!v.localService) nota += 8;                        // voz de rede: normalmente é a neural
+
   return nota;
+}
+
+function ehVozNatural(v) {
+  const nome = (v.name || '').toLowerCase();
+  return contemAlgum(nome, VOZES_NATURAIS) || nome.indexOf('google') !== -1;
+}
+// Escolhe a voz em duas etapas, para que o gênero pedido nunca perca para a
+// qualidade: primeiro separa as candidatas femininas, e só entre elas escolhe
+// a mais natural. Sem isso, uma voz masculina neural ganhava de uma feminina.
+function escolherMelhorVoz(lista) {
+  if (!lista.length) return null;
+
+  const femininas = lista.filter(function (v) {
+    return contemAlgum((v.name || '').toLowerCase(), VOZES_FEMININAS);
+  });
+  const semGeneroConhecido = lista.filter(function (v) {
+    return !contemAlgum((v.name || '').toLowerCase(), VOZES_MASCULINAS);
+  });
+
+  const candidatas = femininas.length ? femininas
+    : (semGeneroConhecido.length ? semGeneroConhecido : lista);
+
+  return candidatas.slice().sort(function (a, b) {
+    return notaDaVoz(b) - notaDaVoz(a);
+  })[0] || null;
 }
 
 function carregarVozes() {
@@ -1409,7 +1447,7 @@ function carregarVozes() {
 
   const salva = lerPreferencia('novaia-voz-nome');
   const preferida = salva ? vozesPortugues.filter(function (v) { return v.name === salva; })[0] : null;
-  vozEscolhida = preferida || vozesPortugues[0] || null;
+  vozEscolhida = preferida || escolherMelhorVoz(vozesPortugues);
 
   montarSeletorDeVoz();
 }
@@ -1423,7 +1461,7 @@ function montarSeletorDeVoz() {
   vozesPortugues.forEach(function (v) {
     const op = document.createElement('option');
     op.value = v.name;
-    op.textContent = v.name;
+    op.textContent = (ehVozNatural(v) ? '★ ' : '') + v.name;
     if (vozEscolhida && v.name === vozEscolhida.name) op.selected = true;
     seletor.appendChild(op);
   });
@@ -1517,8 +1555,9 @@ function falar(texto) {
     const fala = new SpeechSynthesisUtterance(parte);
     if (vozEscolhida) fala.voice = vozEscolhida;
     fala.lang = vozEscolhida ? vozEscolhida.lang : 'pt-BR';
-    fala.rate = 1;
-    fala.pitch = 1.1;   // levemente mais agudo: reforça o timbre feminino
+    // Sem mexer no tom: forçar o tom para cima deixava a voz artificial.
+    fala.rate = 0.97;   // um pouco mais calmo soa mais humano
+    fala.pitch = 1;
     fala.volume = 1;
     try { window.speechSynthesis.speak(fala); } catch (e) {}
   });
