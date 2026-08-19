@@ -191,3 +191,35 @@ Observações:
   um arquivo daquele tipo, para a página continuar leve.
 - **Links inventados:** o modelo é instruído a não chutar endereços, mas
   nenhum modelo é perfeito nisso. Confira antes de confiar num link.
+
+## Informação em tempo real
+
+A IA deixou de depender só do que aprendeu no treinamento. Agora ela consulta a
+internet quando a pergunta exige dado atual, e mostra as fontes no fim da
+resposta para você conferir.
+
+| O que | Fonte | Observação |
+|---|---|---|
+| Data e hora | relógio do servidor | sempre injetado (horário de Brasília) |
+| Cotações | PTAX do **Banco Central** | reserva: frankfurter.app / open.er-api |
+| Bitcoin | CoinGecko | só quando você pergunta |
+| Notícias | Bing Notícias | reserva: Agência Brasil e G1, filtrados |
+| Enciclopédia | Wikipédia em português | pulada em perguntas de notícia |
+| Qualquer página | leitura direta | mande o endereço e ela lê e resume |
+
+Como funciona: o modelo responde `BUSCAR: <termos>` quando percebe que precisa
+de dado atual; o Worker consulta as fontes em paralelo (com prazo de 6s cada,
+para uma fonte lenta não travar a resposta) e refaz a pergunta já com os dados.
+Isso gasta duas chamadas ao modelo, então só acontece quando é necessário.
+
+Armadilhas encontradas na montagem — anotadas para não repetir:
+
+- **Nem toda API funciona de dentro da Cloudflare.** A AwesomeAPI (cotações)
+  responde **429** e o Google Notícias responde **503** aos IPs dos Workers,
+  que são compartilhados. Por isso as fontes acima foram escolhidas por teste,
+  não por suposição.
+- **Sempre verificar `response.ok`.** Sem isso, o corpo de um erro 429 era
+  interpretado como dado e virava "undefined" na resposta da IA.
+- **Dados devem ir dentro da pergunta**, não como aviso de sistema: entregues
+  como sistema, o modelo os ignorava e repetia "não tenho acesso a informações
+  em tempo real".

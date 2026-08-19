@@ -326,7 +326,7 @@ function limparTags(s) {
     .replace(/<[^>]+>/g, ' ')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
-    .replace(/&#(d+);/g, function (_, n) { return String.fromCharCode(Number(n)); })
+    .replace(/&#([0-9]+);/g, function (_, n) { return String.fromCharCode(Number(n)); })
     .replace(/&#x([0-9a-fA-F]+);/g, function (_, n) { return String.fromCharCode(parseInt(n, 16)); })
     .replace(/\s+/g, ' ').trim();
 }
