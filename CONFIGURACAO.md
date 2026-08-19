@@ -93,7 +93,10 @@ Observações:
   várias, as demais ficam na bandeja para o envio seguinte.
 - **Formatos antigos do Office** (.doc, .xls, .ppt) não são lidos — salve como
   .docx, .xlsx ou .pptx.
-- **Modelo de visão:** o `worker.js` usa `@cf/llava-hf/llava-1.5-7b-hf`, que não
-  exige aceitar licença. O modelo de visão da Meta (llama-3.2-vision) é melhor,
-  mas antes de usá-lo é preciso aceitar a licença da Meta no painel da
-  Cloudflare — se quiser, aceite lá e troque a constante MODELO_VISAO.
+- **Modelo de visão:** o `worker.js` usa `@cf/meta/llama-3.2-11b-vision-instruct`,
+  que lê texto dentro de imagens muito bem (bom para documentos escaneados).
+  A licença da Meta já foi aceita nesta conta em 19/08/2026. Se um dia o modelo
+  ficar indisponível, o Worker cai sozinho no reserva `@cf/llava-hf/llava-1.5-7b-hf`,
+  que não exige licença — o chat nunca para por causa disso.
+- **Reaceitar a licença** (se trocar de conta Cloudflare): abra
+  `https://nova-ia-2026.juarez-veloso.workers.dev/aceitar-licenca` e clique no botão.
