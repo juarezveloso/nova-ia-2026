@@ -149,11 +149,10 @@ no navegador.
 - A leitura para sozinha quando você envia uma nova mensagem, e não fala
   enquanto você está ditando pelo microfone (evita eco).
 
-Se a voz soar robótica, é porque o aparelho só tem vozes antigas instaladas.
-O código já prefere as **naturais (neurais)** quando existem — elas aparecem
-no seletor marcadas com ★. A escolha é feita em duas etapas: primeiro separa
-as vozes femininas, depois pega a mais natural entre elas (assim uma voz
-masculina neural nunca ganha de uma feminina).
+A escolha prioriza **naturalidade** (vozes neurais), não o gênero: uma voz
+masculina natural é preferida a uma feminina robótica, porque soa muito melhor.
+Entre vozes de qualidade parecida, a feminina ganha no desempate. As vozes
+naturais aparecem no seletor marcadas com ★.
 
 Onde encontrar mais vozes: no Android, em *Configurações → Idiomas → Saída de
 texto para voz*, dá para instalar vozes adicionais do Google. No Windows, em

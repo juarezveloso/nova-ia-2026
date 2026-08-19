@@ -501,7 +501,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.7</div>
+  <div class="badge">v2026.8</div>
 </header>
 
 
@@ -1400,20 +1400,22 @@ function contemAlgum(texto, lista) {
 // Quanto maior a nota, melhor a voz. Duas coisas pesam: ser feminina e ser
 // natural (neural). As vozes locais antigas soam robóticas, então perdem
 // para as neurais, que o navegador costuma marcar como "online"/"natural".
+// Quanto maior a nota, melhor a voz. A naturalidade pesa mais que o gênero:
+// uma voz masculina neural ganha de uma feminina robótica. Entre vozes de
+// qualidade parecida, a feminina é preferida como desempate.
 function notaDaVoz(v) {
   const nome = (v.name || '').toLowerCase();
   let nota = 0;
 
   if (/pt[-_]?br/i.test(v.lang)) nota += 10;             // português do Brasil primeiro
-  if (contemAlgum(nome, VOZES_FEMININAS)) nota += 25;    // queremos voz feminina
-  if (contemAlgum(nome, VOZES_MASCULINAS)) nota -= 40;
-  if (contemAlgum(nome, VOZES_NATURAIS)) nota += 30;     // qualidade natural
+  if (contemAlgum(nome, VOZES_NATURAIS)) nota += 30;     // voz neural: bem menos robótica
   if (nome.indexOf('google') !== -1) nota += 15;         // as do Google soam bem melhor
   if (!v.localService) nota += 8;                        // voz de rede: normalmente é a neural
+  if (contemAlgum(nome, VOZES_FEMININAS)) nota += 12;    // desempate: preferimos feminina
+  if (contemAlgum(nome, VOZES_MASCULINAS)) nota -= 6;
 
   return nota;
 }
-
 function ehVozNatural(v) {
   const nome = (v.name || '').toLowerCase();
   return contemAlgum(nome, VOZES_NATURAIS) || nome.indexOf('google') !== -1;
@@ -1421,24 +1423,14 @@ function ehVozNatural(v) {
 // Escolhe a voz em duas etapas, para que o gênero pedido nunca perca para a
 // qualidade: primeiro separa as candidatas femininas, e só entre elas escolhe
 // a mais natural. Sem isso, uma voz masculina neural ganhava de uma feminina.
+// Escolhe a melhor voz disponível pela nota: qualidade em primeiro lugar,
+// com a voz feminina levando vantagem quando o resto se equivale.
 function escolherMelhorVoz(lista) {
   if (!lista.length) return null;
-
-  const femininas = lista.filter(function (v) {
-    return contemAlgum((v.name || '').toLowerCase(), VOZES_FEMININAS);
-  });
-  const semGeneroConhecido = lista.filter(function (v) {
-    return !contemAlgum((v.name || '').toLowerCase(), VOZES_MASCULINAS);
-  });
-
-  const candidatas = femininas.length ? femininas
-    : (semGeneroConhecido.length ? semGeneroConhecido : lista);
-
-  return candidatas.slice().sort(function (a, b) {
+  return lista.slice().sort(function (a, b) {
     return notaDaVoz(b) - notaDaVoz(a);
-  })[0] || null;
+  })[0];
 }
-
 function carregarVozes() {
   if (!TEM_SINTESE) return;
   const todas = window.speechSynthesis.getVoices() || [];
