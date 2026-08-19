@@ -100,3 +100,28 @@ Observações:
   que não exige licença — o chat nunca para por causa disso.
 - **Reaceitar a licença** (se trocar de conta Cloudflare): abra
   `https://nova-ia-2026.juarez-veloso.workers.dev/aceitar-licenca` e clique no botão.
+
+## Falar em vez de digitar
+
+Ao lado do clipe há um botão de **microfone** (🎤). Clique, fale, clique de novo
+para parar — o texto cai no campo de digitação, onde você pode revisar e editar
+antes de enviar.
+
+Funciona por dois caminhos, escolhidos automaticamente:
+
+1. **Reconhecimento nativo do navegador** (Chrome, Edge, Safari): o texto
+   aparece na tela enquanto você fala, em tempo real. É instantâneo e **não
+   consome a cota diária de IA**.
+2. **Whisper no Worker** (Firefox e navegadores sem o recurso nativo): grava o
+   áudio, converte para WAV 16 kHz no próprio navegador e envia ao modelo
+   `@cf/openai/whisper-large-v3-turbo`. Consome a cota, mas funciona em
+   qualquer lugar.
+
+Observações:
+
+- **Precisa de HTTPS.** Abrir o `index.html` direto do disco não ativa o
+  microfone — use o endereço do site.
+- **O navegador vai pedir permissão** do microfone na primeira vez. Se você
+  negar sem querer, libere no cadeado ao lado do endereço.
+- Se o navegador não tiver nenhum dos dois caminhos, o botão some sozinho.
+- O idioma está fixado em português do Brasil (`pt-BR`).
