@@ -426,6 +426,41 @@
     color: #9fe8ff; line-height: 1.5; white-space: pre-wrap;
   }
   #log-voz.ativo { display: block; }
+
+  /* ── Voz da IA (leitura em voz alta) ────────────────────── */
+  #voz-ia-btn {
+    margin-left: auto;
+    background: transparent; border: 1px solid var(--border);
+    border-radius: 10px; width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; transition: all 0.2s;
+  }
+  #voz-ia-btn svg { width: 17px; height: 17px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.2s; }
+  #voz-ia-btn:hover { border-color: rgba(108,99,255,0.5); }
+  #voz-ia-btn:hover svg { stroke: var(--accent2); }
+  #voz-ia-btn.ativo { background: rgba(108,99,255,0.2); border-color: var(--accent); }
+  #voz-ia-btn.ativo svg { stroke: var(--accent2); }
+  #voz-ia-btn .onda { opacity: 0; transition: opacity 0.2s; }
+  #voz-ia-btn.ativo .onda { opacity: 1; }
+
+  header .badge { margin-left: 10px; }
+
+  #barra-voz {
+    display: none;
+    position: relative; z-index: 10;
+    align-items: center; gap: 8px;
+    padding: 8px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,10,15,0.7);
+    font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);
+  }
+  #seletor-voz {
+    flex: 1; max-width: 320px;
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 8px; font-size: 11px;
+    font-family: 'Space Mono', monospace;
+  }
 </style>
 </head>
 <body>
@@ -436,8 +471,17 @@
     <h1>Nova IA 2026</h1>
     <p><span class="status-dot"></span>Online — base atualizada até 2026</p>
   </div>
-  <div class="badge">v2026.3</div>
+  <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
+    <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+  </button>
+  <div class="badge">v2026.4</div>
 </header>
+
+
+<div id="barra-voz">
+  <span>🔊 Voz da IA:</span>
+  <select id="seletor-voz" onchange="escolherVoz(this.value)"></select>
+</div>
 
 <div id="messages">
   <div class="suggestions" id="suggestions">
@@ -510,6 +554,9 @@ function suggest(text) {
 }
 
 async function sendMessage() {
+  pararFala();              // silencia a leitura anterior
+  if (ouvindo) pararVoz();  // encerra o ditado antes de enviar
+
   const input = document.getElementById('user-input');
   const texto = input.value.trim();
 
@@ -617,6 +664,8 @@ function appendMessage(role, text) {
   row.appendChild(bubble);
   msgs.appendChild(row);
   msgs.scrollTop = msgs.scrollHeight;
+
+  if (role === 'ai') falar(text); // lê a resposta em voz alta, se ligado
 }
 
 function appendTyping() {
@@ -1280,6 +1329,189 @@ if (location.search.indexOf('debug=voz') !== -1) {
   document.getElementById('log-voz').classList.add('ativo');
   registrarVoz('DIAGNÓSTICO LIGADO', navigator.userAgent.slice(0, 60));
 }
+
+// ── Voz da IA (ler as respostas em voz alta) ──────────────────────────────
+// Usa a síntese de voz do próprio navegador: é instantânea, funciona no
+// celular e não consome nada da cota diária de IA.
+const TEM_SINTESE = typeof window.speechSynthesis !== 'undefined';
+
+let vozAtiva = false;
+let vozEscolhida = null;
+let vozesPortugues = [];
+
+// Nomes conhecidos de vozes femininas e masculinas em português, usados para
+// escolher automaticamente uma voz feminina.
+const VOZES_FEMININAS = ['luciana', 'maria', 'francisca', 'joana', 'fernanda',
+  'camila', 'vitoria', 'vitória', 'helena', 'ana ', 'female', 'feminin', 'mulher'];
+const VOZES_MASCULINAS = ['daniel', 'felipe', 'ricardo', 'joao', 'joão', 'helio',
+  'hélio', 'eddy', 'male', 'masculin', 'homem'];
+
+// O localStorage lança erro quando o armazenamento está bloqueado
+// (navegação privativa, por exemplo). Estas funções nunca quebram a página.
+function lerPreferencia(chave) {
+  try { return window.localStorage.getItem(chave); } catch (e) { return null; }
+}
+function salvarPreferencia(chave, valor) {
+  try { window.localStorage.setItem(chave, valor); } catch (e) {}
+}
+
+function contemAlgum(texto, lista) {
+  for (let i = 0; i < lista.length; i++) {
+    if (texto.indexOf(lista[i]) !== -1) return true;
+  }
+  return false;
+}
+
+// Quanto maior a nota, melhor a voz para o nosso caso.
+function notaDaVoz(v) {
+  const nome = (v.name || '').toLowerCase();
+  let nota = 0;
+  if (/pt[-_]?br/i.test(v.lang)) nota += 10;      // português do Brasil primeiro
+  if (contemAlgum(nome, VOZES_FEMININAS)) nota += 20;
+  if (contemAlgum(nome, VOZES_MASCULINAS)) nota -= 30;
+  if (nome.indexOf('google') !== -1) nota += 5;   // no Chrome/Android é feminina
+  if (v.localService) nota += 2;                  // instalada no aparelho: mais rápida
+  return nota;
+}
+
+function carregarVozes() {
+  if (!TEM_SINTESE) return;
+  const todas = window.speechSynthesis.getVoices() || [];
+  vozesPortugues = todas.filter(function (v) { return /^pt/i.test(v.lang || ''); });
+  vozesPortugues.sort(function (a, b) { return notaDaVoz(b) - notaDaVoz(a); });
+
+  const salva = lerPreferencia('novaia-voz-nome');
+  const preferida = salva ? vozesPortugues.filter(function (v) { return v.name === salva; })[0] : null;
+  vozEscolhida = preferida || vozesPortugues[0] || null;
+
+  montarSeletorDeVoz();
+}
+
+function montarSeletorDeVoz() {
+  const seletor = document.getElementById('seletor-voz');
+  const barra = document.getElementById('barra-voz');
+  if (!seletor || !barra) return;
+
+  seletor.innerHTML = '';
+  vozesPortugues.forEach(function (v) {
+    const op = document.createElement('option');
+    op.value = v.name;
+    op.textContent = v.name;
+    if (vozEscolhida && v.name === vozEscolhida.name) op.selected = true;
+    seletor.appendChild(op);
+  });
+
+  // Só mostra a escolha de voz quando faz diferença (mais de uma disponível)
+  barra.style.display = (vozAtiva && vozesPortugues.length > 1) ? 'flex' : 'none';
+}
+
+function escolherVoz(nome) {
+  const achada = vozesPortugues.filter(function (v) { return v.name === nome; })[0];
+  if (!achada) return;
+  vozEscolhida = achada;
+  salvarPreferencia('novaia-voz-nome', nome);
+  falar('Voz alterada.');
+}
+
+function atualizarBotaoVozIA() {
+  const btn = document.getElementById('voz-ia-btn');
+  if (!btn) return;
+  btn.classList.toggle('ativo', vozAtiva);
+  btn.title = vozAtiva ? 'Desligar a leitura em voz alta' : 'Ler as respostas em voz alta';
+  btn.setAttribute('aria-pressed', vozAtiva ? 'true' : 'false');
+}
+
+function alternarVozIA() {
+  if (!TEM_SINTESE) return;
+  vozAtiva = !vozAtiva;
+  salvarPreferencia('novaia-voz', vozAtiva ? 'sim' : 'nao');
+  atualizarBotaoVozIA();
+  montarSeletorDeVoz();
+
+  if (vozAtiva) {
+    carregarVozes();            // o clique também libera o áudio no celular
+    falar('Voz ativada. Vou ler as respostas para você.');
+  } else {
+    pararFala();
+  }
+}
+
+function pararFala() {
+  if (!TEM_SINTESE) return;
+  try { window.speechSynthesis.cancel(); } catch (e) {}
+}
+
+// Divide o texto em pedaços curtos: falas longas são cortadas por alguns
+// navegadores, e em pedaços a leitura também começa mais rápido.
+function dividirParaFala(texto, limite) {
+  const frases = texto.match(/[^.!?…]+[.!?…]*/g) || [texto];
+  const partes = [];
+  let atual = '';
+  frases.forEach(function (f) {
+    const frase = f.trim();
+    if (!frase) return;
+    if ((atual + ' ' + frase).trim().length <= limite) {
+      atual = (atual + ' ' + frase).trim();
+    } else {
+      if (atual) partes.push(atual);
+      if (frase.length <= limite) {
+        atual = frase;
+      } else {
+        // frase muito longa: quebra por vírgulas / espaços
+        let resto = frase;
+        while (resto.length > limite) {
+          let corte = resto.lastIndexOf(',', limite);
+          if (corte < limite * 0.5) corte = resto.lastIndexOf(' ', limite);
+          if (corte <= 0) corte = limite;
+          partes.push(resto.slice(0, corte).trim());
+          resto = resto.slice(corte).trim();
+        }
+        atual = resto;
+      }
+    }
+  });
+  if (atual) partes.push(atual);
+  return partes;
+}
+
+function falar(texto) {
+  if (!TEM_SINTESE || !vozAtiva || !texto) return;
+  if (ouvindo) return; // você está ditando: não fala por cima do microfone
+
+  pararFala();
+
+  const limpo = String(texto)
+    .replace(/[*_#`>|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!limpo) return;
+
+  dividirParaFala(limpo, 180).forEach(function (parte) {
+    const fala = new SpeechSynthesisUtterance(parte);
+    if (vozEscolhida) fala.voice = vozEscolhida;
+    fala.lang = vozEscolhida ? vozEscolhida.lang : 'pt-BR';
+    fala.rate = 1;
+    fala.pitch = 1.1;   // levemente mais agudo: reforça o timbre feminino
+    fala.volume = 1;
+    try { window.speechSynthesis.speak(fala); } catch (e) {}
+  });
+}
+
+// ── Inicialização ──
+if (!TEM_SINTESE) {
+  const btn = document.getElementById('voz-ia-btn');
+  if (btn) btn.style.display = 'none';
+} else {
+  vozAtiva = lerPreferencia('novaia-voz') === 'sim';
+  atualizarBotaoVozIA();
+  carregarVozes();
+  // No Chrome e no Android a lista de vozes chega depois; recarrega quando vier.
+  window.speechSynthesis.onvoiceschanged = carregarVozes;
+  setTimeout(carregarVozes, 400);
+  setTimeout(carregarVozes, 1500);
+  window.addEventListener('beforeunload', pararFala);
+}
+
 </script>
 </body>
 </html>

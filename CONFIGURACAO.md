@@ -129,3 +129,26 @@ Observações:
   continua acrescentando ao que já foi dito. Só para quando você clica no
   microfone de novo.
 - O idioma está fixado em português do Brasil (`pt-BR`).
+
+## Voz feminina da IA (ler as respostas em voz alta)
+
+No cabeçalho há um botão de alto-falante (🔊). Ligado, ele lê cada resposta da
+IA em voz alta com uma **voz feminina em português**. A preferência fica salva
+no navegador.
+
+- **Escolha automática:** entre as vozes de português instaladas no aparelho, o
+  código prefere as femininas conhecidas (Maria, Luciana, Francisca, Joana,
+  "Google português do Brasil"…) e evita as masculinas (Daniel, Felipe…).
+  Se só houver voz masculina no aparelho, usa a que existe.
+- **Troca manual:** quando o aparelho tem mais de uma voz em português, aparece
+  um seletor logo abaixo do cabeçalho para você escolher outra.
+- **Gratuito:** usa a síntese de voz do próprio navegador — não passa pelo
+  Worker e não consome nada da cota diária de IA.
+- **Textos longos** são quebrados em trechos de até 180 caracteres, porque
+  alguns navegadores cortam falas muito longas.
+- A leitura para sozinha quando você envia uma nova mensagem, e não fala
+  enquanto você está ditando pelo microfone (evita eco).
+
+Onde encontrar mais vozes: no Android, em *Configurações → Idiomas → Saída de
+texto para voz*, dá para instalar vozes adicionais do Google. No Windows, em
+*Configurações → Hora e idioma → Fala*.
