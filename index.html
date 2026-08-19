@@ -436,7 +436,7 @@
     <h1>Nova IA 2026</h1>
     <p><span class="status-dot"></span>Online — base atualizada até 2026</p>
   </div>
-  <div class="badge">v2026.1</div>
+  <div class="badge">v2026.3</div>
 </header>
 
 <div id="messages">
@@ -966,7 +966,13 @@ function limparEspacos(s) {
 // Junta dois trechos ignorando repetição. O navegador às vezes reprocessa o
 // fim do áudio ao reiniciar a escuta, reenviando o que já tinha reconhecido —
 // sem isto, a mesma frase aparecia 2 ou 3 vezes.
-function juntarSemRepetir(base, novo) {
+// Junta dois trechos ignorando repetição. Existem dois comportamentos a tratar:
+//  - No Android, o navegador manda versões que vão CRESCENDO da mesma frase
+//    ("preciso", "preciso de", "preciso de um orçamento") em posições separadas.
+//  - Ao reiniciar a escuta depois de uma pausa, ele reprocessa o fim do áudio
+//    e reenvia o que já havia reconhecido.
+// Sem isto, a mesma frase aparecia 2 ou 3 vezes.
+function juntarSemRepetir(base, novo, mesmaFala) {
   base = limparEspacos(base);
   novo = limparEspacos(novo);
   if (!base) return novo;
@@ -975,19 +981,23 @@ function juntarSemRepetir(base, novo) {
   const b = base.toLowerCase();
   const n = novo.toLowerCase();
 
-  // O trecho novo já está inteiro no fim do que temos: é reenvio, descarta.
+  // Crescimento acumulativo: o trecho novo já contém tudo que temos.
+  // Só vale dentro da mesma fala; entre falas, "sim" + "sim" é repetição real.
+  if (mesmaFala && n.indexOf(b) === 0) return novo;
+
+  // Reenvio: o trecho novo já está inteiro no fim do que temos.
   if (n.length >= 5 && b.slice(-n.length) === n) return base;
 
-  // Sobreposição parcial: acha o maior fim de "base" que é começo de "novo".
+  // Sobreposição parcial: maior fim de "base" que é começo de "novo".
+  const minimo = mesmaFala ? 3 : 6;
   const limite = Math.min(b.length, n.length);
-  for (let k = limite; k >= 6; k--) {
+  for (let k = limite; k >= minimo; k--) {
     if (b.slice(b.length - k) === n.slice(0, k)) {
       return limparEspacos(base + novo.slice(k));
     }
   }
   return base + ' ' + novo;
 }
-
 function textoCompletoDaFala() {
   return juntarSemRepetir(textoFalado, textoSessao);
 }
@@ -1080,14 +1090,13 @@ function iniciarReconhecimentoNativo() {
   reconhecedor.onresult = function (e) {
     if (meuId !== idSessaoVoz) return; // evento de uma sessão já descartada
 
-    let finais = '';
-    let parcial = '';
+    // Emenda os trechos um a um tratando repetição: no Android eles se
+    // sobrepõem, no computador são pedaços distintos da mesma fala.
+    let texto = '';
     for (let i = 0; i < e.results.length; i++) {
-      const trecho = e.results[i][0].transcript;
-      if (e.results[i].isFinal) finais += trecho + ' ';
-      else parcial += trecho + ' ';
+      texto = juntarSemRepetir(texto, e.results[i][0].transcript, true);
     }
-    textoSessao = limparEspacos(finais + parcial);
+    textoSessao = texto;
     registrarVoz('RESULTADO', '(' + e.results.length + ' trechos) "' + textoSessao + '"');
     atualizarCampoDeTexto();
   };
