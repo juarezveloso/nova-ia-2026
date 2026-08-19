@@ -488,6 +488,17 @@
     #input-area { padding: 12px 14px 16px; }
     .hint { font-size: 10px; }
   }
+
+  #testar-voz {
+    flex-shrink: 0;
+    background: var(--surface2); color: var(--accent2);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 10px; cursor: pointer;
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    transition: all 0.2s;
+  }
+  #testar-voz:hover { border-color: var(--accent); background: rgba(108,99,255,0.15); }
+  #testar-voz:active { transform: scale(0.95); }
 </style>
 </head>
 <body>
@@ -501,13 +512,14 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.8</div>
+  <div class="badge">v2026.9</div>
 </header>
 
 
 <div id="barra-voz">
-  <span>🔊 Voz da IA:</span>
+  <span>🔊 Voz:</span>
   <select id="seletor-voz" onchange="escolherVoz(this.value)"></select>
+  <button id="testar-voz" onclick="testarVoz()" title="Ouvir esta voz">▶ ouvir</button>
 </div>
 
 <div id="messages">
@@ -1462,12 +1474,25 @@ function montarSeletorDeVoz() {
   barra.style.display = (vozAtiva && vozesPortugues.length > 1) ? 'flex' : 'none';
 }
 
+// Frase de amostra: tem número e entonação variada, o que ajuda a perceber
+// se a voz soa natural ou robótica.
+const FRASE_DE_TESTE = 'Olá! Eu sou a Nova IA. Esta é a minha voz. O orçamento total ficou em quinze mil e quatrocentos reais.';
+
+// Os nomes das vozes no Android são genéricos ("voz I", "voz II"), então não
+// dá para saber pelo nome qual é melhor: o jeito é ouvir cada uma.
+function testarVoz() {
+  const guardado = vozAtiva;
+  vozAtiva = true;          // permite ouvir mesmo com a leitura desligada
+  falar(FRASE_DE_TESTE);
+  vozAtiva = guardado;
+}
+
 function escolherVoz(nome) {
   const achada = vozesPortugues.filter(function (v) { return v.name === nome; })[0];
   if (!achada) return;
   vozEscolhida = achada;
   salvarPreferencia('novaia-voz-nome', nome);
-  falar('Voz alterada.');
+  testarVoz();
 }
 
 function atualizarBotaoVozIA() {
