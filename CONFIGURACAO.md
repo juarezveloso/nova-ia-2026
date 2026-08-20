@@ -212,6 +212,12 @@ de dado atual; o Worker consulta as fontes em paralelo (com prazo de 6s cada,
 para uma fonte lenta não travar a resposta) e refaz a pergunta já com os dados.
 Isso gasta duas chamadas ao modelo, então só acontece quando é necessário.
 
+PTAX e indicadores oficiais: além do dólar comercial, a IA consulta a **PTAX**
+(compra e venda) e as séries do Banco Central — **Selic**, **IPCA** (mês e 12
+meses) e **INCC** (custo da construção civil). A PTAX de fechamento só sai por
+volta das 13h em dias úteis; antes disso a IA informa a do dia útil anterior e
+explica o motivo, em vez de apresentá-la como sendo de hoje.
+
 Armadilhas encontradas na montagem — anotadas para não repetir:
 
 - **Nem toda API funciona de dentro da Cloudflare.** A AwesomeAPI (cotações)
@@ -223,3 +229,10 @@ Armadilhas encontradas na montagem — anotadas para não repetir:
 - **Dados devem ir dentro da pergunta**, não como aviso de sistema: entregues
   como sistema, o modelo os ignorava e repetia "não tenho acesso a informações
   em tempo real".
+- **Não dependa do modelo pedir a pesquisa.** A pergunta "qual a PTAX de hoje?"
+  não disparava busca de cotação: o modelo não escrevia BUSCAR e a palavra
+  "PTAX" não estava na lista de gatilhos. Hoje há uma verificação determinística
+  na própria pergunta do usuário, além do pedido do modelo.
+- **Nunca devolver dado fora do assunto.** Quando a busca de notícias não
+  encontrava nada, o código caía para as manchetes gerais — e a IA respondia
+  sobre outro tema. Agora, sem resultado relevante, não vai notícia nenhuma.

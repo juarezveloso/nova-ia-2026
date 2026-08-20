@@ -125,12 +125,35 @@ export default {
       } catch (e) { /* sem a página, segue com o que tem */ }
     }
 
+    // Perguntas claramente dependentes de dado atual disparam a pesquisa sozinhas.
+    // Antes dependíamos só do modelo escrever BUSCAR, e ele nem sempre escrevia —
+    // foi assim que "qual a PTAX de hoje?" passou sem consultar cotação nenhuma.
+    const PADRAO_ATUAL = /ptax|d[óo]lar|dolar|euro|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|selic|ipca|incc|infla[çc][ãa]o|juros|ibovespa|b[óo]lsa|not[íi]cia|[úu]ltimas|hoje|agora|atual|recente|pre[çc]o|quanto (est[áa]|custa)|o que (aconteceu|houve)/i;
+
+    let jaPesquisou = false;
+    if (alvo && !enderecos.length && PADRAO_ATUAL.test(alvo.content)) {
+      try {
+        const achado = await pesquisar(alvo.content.slice(0, 200));
+        if (achado.texto) {
+          achado.fontes.forEach(function (f) { fontes.push(f); });
+          alvo.content = 'Dados consultados na internet agora (' + agoraNoBrasil() +
+            '). São reais e atuais.\n\n' + achado.texto +
+            '\n\n---\nUsando os dados acima, responda: ' + alvo.content +
+            '\n\nCite os números e as datas. Se os dados acima não cobrirem a pergunta, ' +
+            'diga isso claramente em vez de inventar. Nunca diga que não tem acesso a ' +
+            'informação em tempo real.';
+          jaPesquisou = true;
+        }
+      } catch (e) { /* segue sem a pesquisa */ }
+    }
+
     try {
       let resultado = await env.AI.run(MODELO, { messages, max_tokens: 1200 });
-      let resposta = resultado.response || '';
+      let resposta = (resultado.response || '');
+      if (jaPesquisou) resposta = resposta.replace(/BUSCAR:.*/gi, '').trim();
 
       // O modelo pediu pesquisa: buscamos e perguntamos de novo com os dados.
-      const pedido = resposta.match(/BUSCAR:\s*(.+)/i);
+      const pedido = jaPesquisou ? null : resposta.match(/BUSCAR:\s*(.+)/i);
       if (pedido && alvo) {
         const termos = pedido[1].split('\n')[0].trim().slice(0, 120);
         const achado = await pesquisar(termos);
@@ -396,8 +419,17 @@ async function buscarNoticias(termos) {
     if (xml) todos = todos.concat(extrairItens(xml, 40));
   });
 
-  const filtrados = filtrarPorTermos(todos, termos);
-  return (filtrados.length ? filtrados : todos).slice(0, 6);
+  // Só devolvemos manchetes que casem com a pergunta. Antes, quando nada casava,
+  // devolvíamos as manchetes gerais — e o modelo respondia sobre outro assunto.
+  const genericas = ['noticia', 'noticias', 'ultimas', 'ultimo', 'hoje', 'agora',
+    'recente', 'recentes', 'atual', 'atuais', 'sobre', 'quais', 'brasil'];
+  const especificas = semAcento(termos).split(/[^a-z0-9]+/).filter(function (p) {
+    return p.length > 3 && genericas.indexOf(p) === -1;
+  });
+  if (!especificas.length) return todos.slice(0, 6);   // pedido genérico de notícias
+
+  const filtrados = filtrarPorTermos(todos, especificas.join(' '));
+  return filtrados.slice(0, 6);
 }
 // Resumo enciclopédico (Wikipédia em português)
 async function buscarWikipedia(termos) {
@@ -450,7 +482,8 @@ async function cotacaoBancoCentral() {
   const c = d && d.value && d.value[0];
   if (!c || !c.cotacaoVenda) throw new Error('sem cotação do BC');
   return {
-    nome: 'Dólar (PTAX oficial do Banco Central)',
+    nome: 'PTAX do Banco Central (dólar oficial) — compra R$ ' +
+      Number(c.cotacaoCompra).toFixed(4) + ' / venda',
     valor: Number(c.cotacaoVenda).toFixed(4),
     quando: String(c.dataHoraCotacao).slice(0, 19),
   };
@@ -488,6 +521,28 @@ async function cotacaoBitcoin() {
   const d = await pegarJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl');
   if (!d.bitcoin || !d.bitcoin.brl) throw new Error('sem bitcoin');
   return { nome: 'Bitcoin', valor: Number(d.bitcoin.brl).toLocaleString('pt-BR'), quando: 'agora' };
+}
+
+// Indicadores econômicos oficiais (séries do Banco Central)
+const SERIES_BC = [
+  { codigo: 432, nome: 'Taxa Selic (meta, ao ano)', sufixo: '%' },
+  { codigo: 13522, nome: 'IPCA acumulado em 12 meses', sufixo: '%' },
+  { codigo: 433, nome: 'IPCA do mês', sufixo: '%' },
+  { codigo: 192, nome: 'INCC (custo da construção civil), no mês', sufixo: '%' },
+];
+
+async function buscarIndicadores() {
+  const achados = await Promise.all(SERIES_BC.map(function (s) {
+    return comPrazo(
+      pegarJson('https://api.bcb.gov.br/dados/serie/bcdata.sgs.' + s.codigo + '/dados/ultimos/1?formato=json'),
+      PRAZO_BUSCA
+    ).then(function (d) {
+      const ponto = d && d[0];
+      if (!ponto) return null;
+      return { nome: s.nome, valor: ponto.valor + s.sufixo, quando: ponto.data };
+    }).catch(function () { return null; });
+  }));
+  return achados.filter(Boolean);
 }
 
 async function buscarCotacoes(termos) {
@@ -531,7 +586,8 @@ async function pesquisar(termos) {
   const fontes = [];
   const partes = [];
 
-  const querCotacao = /d[óo]lar|euro|c[âa]mbio|cota[çc][ãa]o|bitcoin|moeda/i.test(termos);
+  const querCotacao = /ptax|d[óo]lar|dolar|euro|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|usd|brl/i.test(termos);
+  const querIndicador = /selic|ipca|incc|infla[çc][ãa]o|juros|[íi]ndice|economia|custo da constru/i.test(termos);
   const resultados = await Promise.all([
     comPrazo(buscarNoticias(termos), PRAZO_BUSCA).catch(function () { return null; }),
     /not[íi]cia|recente|[úu]ltimas|hoje|agora|atual/i.test(termos)
@@ -539,14 +595,26 @@ async function pesquisar(termos) {
       : comPrazo(buscarWikipedia(termos), PRAZO_BUSCA).catch(function () { return null; }),
     querCotacao ? comPrazo(buscarCotacoes(termos), PRAZO_BUSCA).catch(function () { return null; })
                 : Promise.resolve(null),
+    querIndicador ? buscarIndicadores().catch(function () { return null; })
+                  : Promise.resolve(null),
   ]);
   const noticias = resultados[0], wiki = resultados[1], moedas = resultados[2];
+  const indicadores = resultados[3];
 
   if (moedas && moedas.length) {
     partes.push('COTAÇÕES NESTE MOMENTO:\n' + moedas.map(function (c) {
       return '- ' + c.nome + ': R$ ' + c.valor + ' (medido em ' + c.quando + ')';
     }).join('\n'));
-    fontes.push({ titulo: 'Cotações em tempo real', url: 'https://economia.awesomeapi.com.br' });
+    partes.push('Observação: a PTAX de fechamento é divulgada pelo Banco Central por volta ' +
+      'das 13h em dias úteis. Antes disso, a PTAX mais recente é a do dia útil anterior — ' +
+      'diga isso ao usuário em vez de apresentá-la como sendo de hoje.');
+    fontes.push({ titulo: 'Cotações e PTAX (Banco Central)', url: 'https://www.bcb.gov.br/estabilidadefinanceira/historicocotacoes' });
+  }
+  if (indicadores && indicadores.length) {
+    partes.push('INDICADORES OFICIAIS (Banco Central):\n' + indicadores.map(function (i) {
+      return '- ' + i.nome + ': ' + i.valor + ' (referência: ' + i.quando + ')';
+    }).join('\n'));
+    fontes.push({ titulo: 'Banco Central do Brasil — séries oficiais', url: 'https://www.bcb.gov.br' });
   }
   if (noticias && noticias.length) {
     partes.push('NOTÍCIAS RECENTES:\n' + noticias.map(function (n) {
