@@ -276,3 +276,16 @@ O ícone "IA" virou um rostinho em SVG que reage ao que está acontecendo:
 
 É SVG com animações em CSS: não usa imagem nem biblioteca, e por isso não pesa
 no carregamento.
+
+## Quando a conexão falha
+
+A resposta leva de 8 a 10 segundos (o modelo é grande). Em rede de celular,
+uma oscilação nesse intervalo derrubava a requisição e o texto digitado se
+perdia. Agora:
+
+- **Tentativa automática**: se a rede falhar, ele tenta uma segunda vez sozinho
+  antes de desistir (mostrando "conexão falhou, tentando de novo…").
+- **Prazo de 55 segundos**, com mensagem própria se estourar — assim dá para
+  distinguir "sem internet" de "demorou demais".
+- **Seu texto volta para o campo** se não der certo, e imagens anexadas voltam
+  para a bandeja. Basta tocar em enviar de novo.

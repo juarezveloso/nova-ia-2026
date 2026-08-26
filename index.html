@@ -696,7 +696,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.13</div>
+  <div class="badge">v2026.14</div>
 </header>
 
 
@@ -894,11 +894,7 @@ async function sendMessage() {
     const corpo = { system: promptComMemoria(), messages: history };
     if (imagem) corpo.image = imagem.base64;
 
-    const res = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(corpo)
-    });
+    const res = await enviarAoServidor(corpo);
 
     const data = await res.json();
     typingEl.remove();
@@ -925,7 +921,22 @@ async function sendMessage() {
   } catch (e) {
     typingEl.remove();
     history.pop();
-    appendMessage('ai', 'Não consegui falar com o servidor de IA. Verifique sua internet e tente novamente.');
+    rosto(null);
+
+    // Devolve o que a pessoa escreveu, para não obrigar a digitar tudo de novo.
+    if (texto && !input.value.trim()) {
+      input.value = texto;
+      autoResize(input);
+    }
+    // As imagens que não chegaram a ser enviadas voltam para a bandeja.
+    if (imagem && !anexos.some(function (a) { return a.nome === imagem.nome; })) {
+      anexos.unshift(imagem);
+      renderizarAnexos();
+    }
+
+    appendMessage('ai', (e && e.deTransporte && e.message)
+      ? e.message
+      : 'Não consegui falar com o servidor de IA. Verifique sua conexão e tente de novo — seu texto foi preservado.');
   }
 
   btn.disabled = false;
@@ -2374,6 +2385,43 @@ function promptComMemoria() {
 }
 
 carregarMemoria();
+
+// ── Envio resistente a rede instável ──────────────────────────────────────
+// A resposta leva ~8s, e em rede de celular uma queda nesse intervalo derrubava
+// tudo. Agora há prazo definido, uma tentativa extra automática e mensagens que
+// dizem o que realmente aconteceu.
+const PRAZO_RESPOSTA = 55000;   // ms
+
+async function enviarAoServidor(corpo, tentativa) {
+  const controle = new AbortController();
+  const relogio = setTimeout(function () { controle.abort(); }, PRAZO_RESPOSTA);
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo),
+      signal: controle.signal,
+    });
+    clearTimeout(relogio);
+    return res;
+  } catch (e) {
+    clearTimeout(relogio);
+    const expirou = e && e.name === 'AbortError';
+    // Uma segunda chance: quedas de rede no celular costumam ser passageiras.
+    if (!expirou && !tentativa) {
+      mostrarStatusVoz('⚠️ conexão falhou, tentando de novo…');
+      await new Promise(function (ok) { setTimeout(ok, 1200); });
+      const r = await enviarAoServidor(corpo, 1);
+      mostrarStatusVoz('');
+      return r;
+    }
+    const erro = new Error(expirou
+      ? 'A resposta demorou mais de 55 segundos. Pode ser a rede ou uma pergunta muito pesada — tente de novo, ou faça uma pergunta mais curta.'
+      : 'Não consegui falar com o servidor de IA. Verifique sua conexão e toque em enviar de novo — seu texto foi preservado.');
+    erro.deTransporte = true;
+    throw erro;
+  }
+}
 </script>
 </body>
 </html>
