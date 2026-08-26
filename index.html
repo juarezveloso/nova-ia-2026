@@ -736,7 +736,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.15</div>
+  <div class="badge">v2026.16</div>
 </header>
 
 
@@ -931,10 +931,46 @@ async function sendMessage() {
   const typingEl = appendTyping();
 
   try {
-    const corpo = { system: promptComMemoria(), messages: history, modelo: modeloEscolhido };
+    const corpo = { system: promptComMemoria(), messages: history, modelo: modeloEscolhido, fluxo: true };
     if (imagem) corpo.image = imagem.base64;
 
     const res = await enviarAoServidor(corpo);
+
+    // Resposta em fluxo: o texto vai aparecendo enquanto chega.
+    const emFluxo = res.ok &&
+      (res.headers.get('content-type') || '').indexOf('text/plain') !== -1 && res.body;
+    if (emFluxo) {
+      const r = await lerEmFluxo(res, typingEl);
+      const separado = separarAprendizado(r.texto);
+      const resposta = separado.texto || r.texto;
+      const aprendidos = separado.fatos.filter(aprender);
+
+      history.push({ role: 'assistant', content: resposta });
+      rosto('contente', 1200);
+
+      if (r.bolha) {
+        // Terminou: refaz a bolha com links, tabelas e arquivos.
+        renderizarResposta(r.bolha, resposta);
+        if (r.fontes && r.fontes.length) r.bolha.appendChild(criarListaDeFontes(r.fontes));
+        if (aprendidos.length) {
+          const aviso = document.createElement('div');
+          aviso.className = 'aprendi';
+          aviso.textContent = '🧠 aprendi: ' + aprendidos.join(' • ');
+          r.bolha.appendChild(aviso);
+        }
+        falar(textoParaFala(resposta));
+      } else {
+        appendMessage('ai', resposta || 'Não veio resposta. Tente de novo.', r.fontes, aprendidos);
+      }
+
+      if (sobras.length) {
+        appendMessage('ai', 'Consigo analisar uma imagem por vez. Ainda há ' + sobras.length +
+          ' anexada(s) — é só enviar de novo para eu continuar.');
+      }
+      btn.disabled = false;
+      input.focus();
+      return;
+    }
 
     const data = await res.json();
     typingEl.remove();
@@ -974,7 +1010,7 @@ async function sendMessage() {
       renderizarAnexos();
     }
 
-    appendMessage('ai', (e && e.deTransporte && e.message)
+    appendMessage('ai', (e && (e.deTransporte || e.doModelo) && e.message)
       ? e.message
       : 'Não consegui falar com o servidor de IA. Verifique sua conexão e tente de novo — seu texto foi preservado.');
   }
@@ -2484,6 +2520,72 @@ function marcarVelocidade() {
 }
 
 marcarVelocidade();
+
+// ── Resposta em fluxo ─────────────────────────────────────────────────────
+// O texto aparece conforme o modelo escreve. Além de parecer bem mais rápido,
+// mantém dados correndo na conexão — que era o que fazia a rede do celular
+// derrubar respostas longas (chegavam a 25 segundos de silêncio).
+function criarBalaoDaIA() {
+  const msgs = document.getElementById('messages');
+  const linha = document.createElement('div');
+  linha.className = 'msg-row ai';
+
+  const av = document.createElement('div');
+  av.className = 'msg-avatar ai';
+  av.innerHTML = SVG_ROSTINHO;
+
+  const bolha = document.createElement('div');
+  bolha.className = 'bubble ai';
+
+  linha.appendChild(av);
+  linha.appendChild(bolha);
+  msgs.appendChild(linha);
+  msgs.scrollTop = msgs.scrollHeight;
+  return bolha;
+}
+
+async function lerEmFluxo(res, typingEl) {
+  const leitor = res.body.getReader();
+  const decodificador = new TextDecoder();
+  const msgs = document.getElementById('messages');
+  let sobra = '';
+  let texto = '';
+  let fontes = [];
+  let bolha = null;
+
+  while (true) {
+    const pedaco = await leitor.read();
+    if (pedaco.done) break;
+    sobra += decodificador.decode(pedaco.value, { stream: true });
+
+    const linhas = sobra.split('\n');
+    sobra = linhas.pop();
+    for (const linha of linhas) {
+      if (!linha.trim()) continue;
+      let dado;
+      try { dado = JSON.parse(linha); } catch (e) { continue; }
+
+      if (dado.tipo === 'fontes') {
+        fontes = dado.fontes || [];
+      } else if (dado.tipo === 'texto') {
+        if (!bolha) {
+          if (typingEl) typingEl.remove();
+          rosto(null);
+          bolha = criarBalaoDaIA();
+        }
+        texto += dado.t;
+        // Enquanto escreve, mostra texto simples: rápido e sem piscar.
+        bolha.textContent = separarAprendizado(texto).texto;
+        msgs.scrollTop = msgs.scrollHeight;
+      } else if (dado.tipo === 'erro') {
+        const erro = new Error(dado.mensagem);
+        erro.doModelo = true;
+        throw erro;
+      }
+    }
+  }
+  return { texto: texto, fontes: fontes, bolha: bolha };
+}
 </script>
 </body>
 </html>

@@ -164,6 +164,28 @@ export default {
       } catch (e) { /* segue sem a pesquisa */ }
     }
 
+    // Modo fluxo: a resposta sai em pedaços, conforme o modelo escreve.
+    // Uma resposta longa levava 25s de espera em silêncio — tempo suficiente
+    // para a rede do celular derrubar a conexão. Em fluxo, o primeiro pedaço
+    // chega em ~1s e os dados continuam correndo, o que segura a conexão viva.
+    if (body.fluxo) {
+      try {
+        const fluxoIA = await env.AI.run(modeloEmUso, {
+          messages: messages, max_tokens: 1200, stream: true,
+        });
+        return new Response(montarFluxo(fluxoIA, fontes), {
+          status: 200,
+          headers: Object.assign({}, CORS, {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+          }),
+        });
+      } catch (e) {
+        return jsonResponse({ error: { message: descreverErro(e) } }, 502);
+      }
+    }
+
     try {
       let resultado = await env.AI.run(modeloEmUso, { messages, max_tokens: 1200 });
       let resposta = (resultado.response || '');
@@ -645,6 +667,51 @@ async function pesquisar(termos) {
   }
 
   return { texto: partes.join('\n\n'), fontes: fontes };
+}
+// Converte o fluxo do modelo (formato SSE) em linhas JSON simples, uma por
+// pedaço. A primeira linha leva as fontes consultadas.
+function montarFluxo(fluxoIA, fontes) {
+  const codificar = new TextEncoder();
+  const decodificar = new TextDecoder();
+
+  return new ReadableStream({
+    async start(controlador) {
+      controlador.enqueue(codificar.encode(
+        JSON.stringify({ tipo: 'fontes', fontes: fontes }) + '\n'));
+
+      const leitor = fluxoIA.getReader();
+      let sobra = '';
+      try {
+        while (true) {
+          const pedaco = await leitor.read();
+          if (pedaco.done) break;
+          sobra += decodificar.decode(pedaco.value, { stream: true });
+
+          const linhas = sobra.split('\n');
+          sobra = linhas.pop();
+          for (const linha of linhas) {
+            const limpa = linha.trim();
+            if (limpa.indexOf('data:') !== 0) continue;
+            const dados = limpa.slice(5).trim();
+            if (!dados || dados === '[DONE]') continue;
+            try {
+              const j = JSON.parse(dados);
+              if (j.response) {
+                controlador.enqueue(codificar.encode(
+                  JSON.stringify({ tipo: 'texto', t: j.response }) + '\n'));
+              }
+            } catch (e) { /* pedaço incompleto: ignora */ }
+          }
+        }
+      } catch (e) {
+        controlador.enqueue(codificar.encode(
+          JSON.stringify({ tipo: 'erro', mensagem: descreverErro(e) }) + '\n'));
+      } finally {
+        controlador.enqueue(codificar.encode(JSON.stringify({ tipo: 'fim' }) + '\n'));
+        controlador.close();
+      }
+    },
+  });
 }
 function descreverErro(e) {
   const msg = e && e.message ? e.message : String(e);

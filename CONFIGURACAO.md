@@ -312,3 +312,24 @@ Modelos testados e descartados:
 - **Llama 3.2 3B** (`@cf/meta/llama-3.2-3b-instruct`) — o mais veloz, mas **errou
   o INCC** (disse ser índice de preços ao consumidor, quando é de custo da
   construção) e truncou uma conta no meio. Fora da lista de propósito.
+
+## Resposta em fluxo (streaming)
+
+O texto agora aparece **conforme o modelo escreve**, em vez de surgir de uma vez
+no fim. Isso resolveu a causa real das quedas de conexão no celular.
+
+O diagnóstico: nenhuma requisição falhava por tamanho, mas respostas longas —
+principalmente com documento anexado — levavam **de 13 a 25 segundos**. Vinte e
+cinco segundos de silêncio é tempo de sobra para a rede do celular derrubar a
+conexão (troca de WiFi para 4G, tela bloqueando, sinal oscilando).
+
+Com o fluxo:
+
+- O **primeiro texto chega em ~3s** em vez de 15s a 25s.
+- Os dados **correm continuamente** (centenas de pedaços), o que segura a conexão
+  viva — é o que impede a queda.
+- Enquanto escreve, mostra texto simples; ao terminar, refaz com links, tabelas,
+  arquivos e fontes.
+
+Se o servidor responder no formato antigo (sem fluxo), a página aceita os dois —
+nada quebra.
