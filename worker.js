@@ -12,6 +12,22 @@ const ORIGEM_PERMITIDA = 'https://juarezveloso.github.io';
 // '@cf/meta/llama-3.1-8b-instruct' (mais leve, rende muito mais respostas por dia).
 const MODELO = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
+// Modelos que a página pode pedir. A lista é fechada de propósito: assim
+// ninguém usa o Worker para rodar qualquer modelo por conta própria.
+// Modelos que a página pode pedir. Medidos em 26/08/2026 com perguntas reais:
+//   completo (Llama 70B)     ~11s  acertou tudo
+//   rapido   (Mistral 24B)    ~8s  acertou tudo — mais rápido e igualmente correto
+//   llama-3.1-8b             MORTO  descontinuado pela Cloudflare em 30/05/2026
+//   llama-3.2-3b              ~5s  errou o INCC e truncou contas: fora da lista
+const MODELOS = {
+  completo: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  rapido: '@cf/mistralai/mistral-small-3.1-24b-instruct',
+};
+
+function escolherModelo(pedido) {
+  return MODELOS[pedido] || MODELO;
+}
+
 // Modelo de visão da Meta: lê texto dentro de imagens e documentos escaneados
 // bem melhor que o reserva. Exige aceitar a licença da Meta uma vez por conta —
 // abra /aceitar-licenca neste Worker para fazer isso.
@@ -104,6 +120,7 @@ export default {
     }
 
     const fontes = [];
+    const modeloEmUso = escolherModelo(body.modelo);
 
     // Data e hora reais: sozinho, o modelo não sabe que dia é hoje.
     messages.splice(sistema ? 1 : 0, 0, {
@@ -148,7 +165,7 @@ export default {
     }
 
     try {
-      let resultado = await env.AI.run(MODELO, { messages, max_tokens: 1200 });
+      let resultado = await env.AI.run(modeloEmUso, { messages, max_tokens: 1200 });
       let resposta = (resultado.response || '');
       if (jaPesquisou) resposta = resposta.replace(/BUSCAR:.*/gi, '').trim();
 
@@ -172,19 +189,19 @@ export default {
             'Responda com o que você sabe e avise que não conseguiu confirmar dados atuais.\n' +
             'Pergunta: ' + perguntaOriginal;
 
-        resultado = await env.AI.run(MODELO, { messages, max_tokens: 1200 });
+        resultado = await env.AI.run(modeloEmUso, { messages, max_tokens: 1200 });
         resposta = (resultado.response || '').replace(/BUSCAR:.*/gi, '').trim();
 
         // Se os dados não serviram, o modelo às vezes devolve vazio: refazemos
         // a pergunta original em vez de deixar o usuário sem resposta.
         if (!resposta) {
           alvo.content = perguntaOriginal;
-          resultado = await env.AI.run(MODELO, { messages, max_tokens: 1200 });
+          resultado = await env.AI.run(modeloEmUso, { messages, max_tokens: 1200 });
           resposta = (resultado.response || '').replace(/BUSCAR:.*/gi, '').trim();
         }
       }
 
-      const saida = { reply: resposta, fontes: fontes };
+      const saida = { reply: resposta, fontes: fontes, modelo: modeloEmUso };
       if (body.debug) saida.contexto = alvo ? alvo.content.slice(0, 1200) : null;
       return jsonResponse(saida, 200);
     } catch (e) {

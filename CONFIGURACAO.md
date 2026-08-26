@@ -289,3 +289,25 @@ perdia. Agora:
   distinguir "sem internet" de "demorou demais".
 - **Seu texto volta para o campo** se não der certo, e imagens anexadas voltam
   para a bandeja. Basta tocar em enviar de novo.
+
+## Velocidade x qualidade
+
+No cabeçalho há dois botões: **⚡ rápido** e **🎯 completo**. A escolha fica salva.
+
+Medição feita em 26/08/2026, alternando 5 rodadas entre os modelos para diluir a
+variação de carga do servidor:
+
+| opção | modelo | mediana | acertos |
+|---|---|---|---|
+| ⚡ rápido (padrão) | Mistral Small 24B | **2,0s** | 3/3 |
+| 🎯 completo | Llama 3.3 70B | 4,0s | 3/3 |
+
+O rápido virou padrão por ser 50% mais veloz **com a mesma precisão** nos testes,
+inclusive acertando o INCC. Use o completo em perguntas de raciocínio mais longo.
+
+Modelos testados e descartados:
+
+-  — **descontinuado** pela Cloudflare em 30/05/2026
+  (retornava erro 5028; resposta chegava vazia na tela).
+-  — rápido, mas **errou o INCC** (disse ser índice
+  de preços ao consumidor) e truncou uma conta no meio. Fora da lista de propósito.

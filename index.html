@@ -665,6 +665,42 @@
     margin-top: 8px; font-size: 11px; color: var(--accent2);
     font-family: 'Space Mono', monospace;
   }
+
+  /* ── Escolha de velocidade ──────────────────────────────── */
+  #velocidade {
+    display: flex; gap: 4px; margin-left: auto;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 3px;
+  }
+  #velocidade button {
+    background: none; border: none; border-radius: 7px;
+    padding: 5px 9px; cursor: pointer;
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    color: var(--muted); transition: all 0.2s; white-space: nowrap;
+  }
+  #velocidade button:hover { color: var(--text); }
+  #velocidade button.ativa {
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    color: #fff; font-weight: 700;
+  }
+  header .badge { margin-left: 8px; }
+
+  @media (max-width: 520px) {
+    #velocidade button { padding: 4px 6px; font-size: 9px; }
+  }
+
+  /* Em telas estreitas o seletor de velocidade desce para a linha de baixo,
+     senão o título e o selo de versão saem da tela. */
+  @media (max-width: 560px) {
+    header { flex-wrap: wrap; row-gap: 8px; }
+    .header-info { flex: 1 1 auto; min-width: 0; }
+    #velocidade {
+      order: 10; width: 100%; margin-left: 0;
+      justify-content: center;
+    }
+    #velocidade button { flex: 1; text-align: center; padding: 6px 4px; }
+    #memoria-btn { margin-left: auto; }
+  }
 </style>
 </head>
 <body>
@@ -690,13 +726,17 @@
     <h1>Nova IA 2026</h1>
     <p><span class="status-dot"></span>Online<span class="so-tela-larga"> — base atualizada até 2026</span></p>
   </div>
+  <div id="velocidade">
+    <button data-modelo="rapido" onclick="escolherVelocidade('rapido')" title="Respostas em poucos segundos, mais simples">⚡ rápido</button>
+    <button data-modelo="completo" onclick="escolherVelocidade('completo')" title="Respostas melhores, porém mais lentas">🎯 completo</button>
+  </div>
   <button id="memoria-btn" onclick="alternarPainelMemoria()" title="O que a IA aprendeu sobre você">
     🧠<span class="contador" id="memoria-contador">0</span>
   </button>
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.14</div>
+  <div class="badge">v2026.15</div>
 </header>
 
 
@@ -891,7 +931,7 @@ async function sendMessage() {
   const typingEl = appendTyping();
 
   try {
-    const corpo = { system: promptComMemoria(), messages: history };
+    const corpo = { system: promptComMemoria(), messages: history, modelo: modeloEscolhido };
     if (imagem) corpo.image = imagem.base64;
 
     const res = await enviarAoServidor(corpo);
@@ -2422,6 +2462,28 @@ async function enviarAoServidor(corpo, tentativa) {
     throw erro;
   }
 }
+
+// ── Velocidade x qualidade ────────────────────────────────────────────────
+// O modelo completo (70 bilhões de parâmetros) responde melhor mas leva ~8s;
+// o rápido leva ~3s e dá conta do dia a dia. A escolha fica salva.
+// Padrão: o rápido. Medido em 26/08/2026 alternando 5 rodadas — mediana de 2,0s
+// contra 4,0s do completo, e acertou as mesmas perguntas (inclusive o INCC).
+let modeloEscolhido = lerPreferencia('novaia-modelo') || 'rapido';
+
+function escolherVelocidade(qual) {
+  modeloEscolhido = qual;
+  salvarPreferencia('novaia-modelo', qual);
+  marcarVelocidade();
+}
+
+function marcarVelocidade() {
+  const botoes = document.querySelectorAll('#velocidade button');
+  for (let i = 0; i < botoes.length; i++) {
+    botoes[i].classList.toggle('ativa', botoes[i].getAttribute('data-modelo') === modeloEscolhido);
+  }
+}
+
+marcarVelocidade();
 </script>
 </body>
 </html>
