@@ -448,3 +448,48 @@ segundo ler a imagem antiga e desfazer o efeito do primeiro.
 O pedido em português é traduzido para um prompt em inglês antes de desenhar:
 em português o gerador entrega um resultado literal e pobre, e a tradução custa
 quase nada. A legenda embaixo da imagem mostra o prompt que foi realmente usado.
+
+## Conversas guardadas, codigo, miniatura e passo a passo
+
+### Painel de conversas (botao no canto superior esquerdo)
+
+Toque no botao de tres tracos para abrir a lista das suas conversas. Da para
+**abrir**, **fixar no topo** (alfinete), **renomear** (lapis) e **apagar**
+(lixeira). "+ Nova conversa" comeca do zero sem perder as anteriores.
+
+Cada conversa guarda **duas coisas diferentes**, porque elas sao mesmo
+distintas: as linhas que aparecem na tela (onde o anexo e so "orcamento.pdf")
+e o contexto que a IA recebe (onde vai o documento inteiro). Sem isso, reabrir
+uma conversa despejaria o documento inteiro dentro do balao.
+
+Limites, para nao estourar o armazenamento do navegador:
+
+- cada mensagem guardada e cortada em **4000 caracteres**;
+- a lista fica em **40 conversas** (as fixadas nao entram nessa conta);
+- se a cota estourar mesmo assim, as mais antigas sao descartadas em vez de se
+  perder a conversa em uso;
+- **imagem gerada nao e guardada** (cada uma passa de 300 KB em base64) - fica
+  o registro do que foi desenhado, e a imagem some ao reabrir.
+
+Tudo fica **so no aparelho**, no armazenamento do navegador. Nao vai para
+servidor nenhum, e nao aparece em outro celular ou computador.
+
+### Blocos de codigo com botao de copiar
+
+Quando a resposta traz codigo, ele aparece numa caixa escura com a linguagem no
+canto e um botao **copiar**. Usa a area de transferencia do navegador e cai para
+um campo escondido quando ela esta bloqueada - assim funciona ate nos
+navegadores antigos do Android. A leitura em voz alta tambem parou de soletrar
+codigo: ela diz apenas "bloco de codigo na tela".
+
+### Miniatura do anexo
+
+Imagem anexada aparece como miniatura de verdade, e nao mais como um icone
+generico - da para conferir se e o arquivo certo antes de enviar.
+
+### Passo a passo
+
+No lugar do pontinho piscando, a Bebi diz o que esta fazendo: *olhando a
+imagem*, *lendo o documento*, *consultando dados atuais*, *desenhando*. Ela so
+anuncia o que realmente vai acontecer - o aviso de consulta a internet usa o
+mesmo gatilho que o Worker usa para decidir buscar.
