@@ -384,3 +384,67 @@ Ou seja: se você passa o dia analisando documentos grandes, a cota acaba mesmo.
 Para esticar, anexe só as páginas que interessam e prefira o modo ⚡ rápido.
 O que **não** gasta nada de cota: gerar arquivos (Excel, Word, PDF), ler as
 respostas em voz alta, e ditar pelo microfone no Chrome/Edge.
+
+## Desenhar e tratar imagens
+
+A Bebi desenha. Peça `desenhe uma casa moderna com telhado verde`, ou toque no
+botão **🎨** ao lado do clipe e descreva a imagem.
+
+### Como ela decide que é um desenho
+
+O gatilho é **determinístico**, pela mesma razão da busca na internet: esperar
+o modelo avisar que quer desenhar já falhou antes. A regra tem duas partes:
+
+- **Verbos que só existem para desenhar** (`desenhe`, `desenha`, `desenhar`,
+  `ilustre`) valem sozinhos — `desenhe uma casa` basta.
+- **Verbos genéricos** (`crie`, `gere`, `faça`, `monte`) só valem acompanhados
+  de um substantivo de imagem (`imagem`, `foto`, `logo`, `banner`, `ícone`…),
+  senão `crie uma planilha` e `gere um relatório` virariam desenho.
+
+As terminações são fechadas de propósito: o substantivo `desenho` fica de fora,
+então `analise este desenho técnico` continua indo para a conversa normal.
+Testado com 29 frases reais — 11 devem disparar, 18 não.
+
+### Transformar uma imagem que você anexou
+
+Anexe a foto, ligue o 🎨 e diga a mudança (`deixe em aquarela`).
+
+**Aviso honesto:** os três modelos de img2img do plano gratuito estão **sem
+capacidade** — erro 3040 em 5 de 5 tentativas, medido em 26/08/2026. Por isso o
+Worker tenta os três e, se nenhum atender, **dá a volta**: o modelo de visão
+descreve a imagem e o gerador a redesenha já com a mudança pedida. Não preserva
+a foto pixel a pixel, mas mantém o assunto e a composição, e funciona hoje. Se
+a Cloudflare liberar capacidade, a cadeia volta a usar o img2img sozinha.
+
+### Tratar a imagem (de graça, no aparelho)
+
+Abaixo de cada imagem há botões que trabalham **no seu próprio celular**, com
+canvas: são instantâneos, funcionam sem internet e **não gastam nada de cota**.
+
+| Botão | Para que serve |
+|---|---|
+| ↻ girar | endireita foto tirada de lado (90° por toque) |
+| ⬛ P&B | tira a cor — deixa documento escaneado mais legível |
+| ☀ clarear / 🌙 escurecer | corrige foto estourada ou escura demais |
+| ◐ contraste | destaca texto apagado em papel |
+| 📉 reduzir | encolhe para no máximo 1000px, para enviar por WhatsApp/e-mail |
+| ⬇ baixar | salva **como está na tela**, com os efeitos aplicados |
+| 🔄 outra versão | desenha de novo, com o mesmo pedido |
+
+Os efeitos **se acumulam**: girar, depois P&B, depois contraste vai somando.
+A barra inteira trava enquanto um efeito é aplicado — carregar a imagem é
+assíncrono, e tocar num segundo botão antes do primeiro terminar fazia o
+segundo ler a imagem antiga e desfazer o efeito do primeiro.
+
+### Quanto custa de cota
+
+| O que | Modelo | Custo aproximado |
+|---|---|---|
+| Desenhar | flux-1-schnell, 6 passos | **~60 neurônios** (~160 imagens/dia) |
+| Traduzir o pedido para inglês | Mistral Small | ~3 neurônios |
+| Redesenhar a partir de uma foto | visão + flux | ~90 neurônios |
+| Tratar (girar, P&B, contraste…) | nenhum — é no navegador | **zero** |
+
+O pedido em português é traduzido para um prompt em inglês antes de desenhar:
+em português o gerador entrega um resultado literal e pobre, e a tradução custa
+quase nada. A legenda embaixo da imagem mostra o prompt que foi realmente usado.

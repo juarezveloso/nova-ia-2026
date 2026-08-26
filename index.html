@@ -760,7 +760,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.18</div>
+  <div class="badge">v2026.19</div>
 </header>
 
 
@@ -2556,8 +2556,20 @@ function criarAcoesDeImagem(img, pedido) {
 // Cada tratamento redesenha a imagem num canvas e substitui o que está na
 // tela, então os efeitos se acumulam e o botão de baixar sempre entrega o
 // que você está vendo.
+//
+// A barra inteira trava durante a operação, não só o botão tocado: carregar a
+// imagem é assíncrono, e tocar num segundo botão antes do primeiro terminar
+// fazia o segundo ler a imagem antiga e desfazer o efeito do primeiro — fácil
+// de acontecer no celular, onde os botões ficam colados.
+function travarAcoes(botao, travado) {
+  const barra = botao && botao.parentNode;
+  if (!barra) return;
+  const botoes = barra.querySelectorAll('button');
+  for (let i = 0; i < botoes.length; i++) botoes[i].disabled = travado;
+}
+
 function tratarImagem(img, operacao, botao) {
-  if (botao) botao.disabled = true;
+  travarAcoes(botao, true);
   const base = new Image();
 
   base.onload = function () {
@@ -2584,10 +2596,10 @@ function tratarImagem(img, operacao, botao) {
     ctx.drawImage(base, 0, 0, largura, altura);
 
     img.src = canvas.toDataURL('image/jpeg', 0.9);
-    if (botao) botao.disabled = false;
+    travarAcoes(botao, false);
   };
 
-  base.onerror = function () { if (botao) botao.disabled = false; };
+  base.onerror = function () { travarAcoes(botao, false); };
   base.src = img.src;
 }
 
