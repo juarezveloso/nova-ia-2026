@@ -1,4 +1,4 @@
-# Como fazer o chat da Nova IA 2026 funcionar — de graça
+# Como fazer o chat da Bebi funcionar — de graça
 
 O erro "Erro de conexão" acontecia porque a página tentava chamar uma API de
 IA direto do navegador, sem chave e sem os cabeçalhos obrigatórios — o
@@ -49,16 +49,15 @@ nenhum custo.
 
 ## Observações
 
-- **Cota gratuita:** o plano free da Cloudflare dá uma cota diária de uso da
-  IA (renovada todo dia). Para uso pessoal e demonstrações, sobra. Se a cota
-  do dia acabar, o chat mostra um aviso e volta a funcionar no dia seguinte.
-- **Render mais respostas por dia:** o `worker.js` usa o modelo Llama 3.3 70B
-  (melhor qualidade em português). Se quiser multiplicar a quantidade de
-  respostas diárias, troque a constante `MODELO` no `worker.js` por
-  `@cf/meta/llama-3.1-8b-instruct` (modelo mais leve).
+- **Cota gratuita:** 10.000 neurônios por dia, renovados às **00:00 UTC
+  (21h de Brasília)** — não é à meia-noite daqui. Veja a seção
+  "Cota e sobrecarga" mais abaixo para as contas.
+- **Render mais respostas por dia:** use o modo **⚡ rápido** (Mistral Small).
+  Ele gasta cerca de **4x menos** que o Llama 70B no texto que escreve.
+  Não troque por `llama-3.1-8b`: a Cloudflare o desligou em 30/05/2026.
 - **Sinceridade sobre a "base 2026":** o Llama não tem conhecimento real até
   2026 (o corte de treinamento dele é anterior). A página continua com a
-  persona "Nova IA 2026", mas as respostas sobre fatos muito recentes podem
+  persona "Bebi", mas as respostas sobre fatos muito recentes podem
   ser imprecisas.
 - **Se um dia quiser usar o Claude (Anthropic):** é a versão paga — basta
   voltar o `worker.js` para chamar `api.anthropic.com` com uma chave guardada
@@ -333,3 +332,55 @@ Com o fluxo:
 
 Se o servidor responder no formato antigo (sem fluxo), a página aceita os dois —
 nada quebra.
+
+## Cota e sobrecarga — dois erros diferentes
+
+O chat mostrava "cota diária esgotada, tente amanhã" para **qualquer** erro
+parecido, porque um único teste juntava tudo:
+`/capacity|limit|quota|exceed|429/`. Só que a Cloudflare devolve dois erros
+bem distintos, ambos com HTTP 429:
+
+| Código | O que é | Quanto dura |
+|---|---|---|
+| **3040** | os servidores do modelo encheram | segundos — repetir resolve |
+| **3036 / 4006** | a cota diária da conta acabou | até as 00:00 UTC (21h de Brasília) |
+
+Tratar o 3040 como cota mandava o usuário embora por um soluço de meio segundo.
+Pior: há um defeito **conhecido e muito relatado** da Cloudflare em que ela
+devolve 4006 ("cota esgotada") com o painel marcando 0 de 10.000 neurônios
+usados — ou seja, nem sempre "cota esgotada" significa cota esgotada.
+
+Como ficou (`chamarIA` no `worker.js`):
+
+1. Tenta o modelo escolhido.
+2. Falhou com erro passageiro? Espera 0,4s e tenta de novo.
+3. Ainda falhou? Espera 1,2s e tenta **no outro modelo** — muitas vezes um
+   tem capacidade quando o outro não tem.
+4. Só então desiste, e aí diz **qual** dos dois problemas foi, com a hora
+   real da renovação.
+
+Erros definitivos (licença não aceita, modelo inexistente, pedido inválido)
+falham na hora: repetir não mudaria nada e só faria o usuário esperar.
+
+### Quantas perguntas cabem em 10.000 neurônios
+
+O custo é por token, e o que a IA **escreve** custa muito mais caro que o que
+ela **lê**. Por isso o Mistral rende bem mais que o Llama 70B:
+
+| Modelo | Ler (por milhão) | Escrever (por milhão) |
+|---|---|---|
+| ⚡ rápido — Mistral Small 24B | 31.876 | 50.488 |
+| 🎯 completo — Llama 3.3 70B | 26.668 | **204.805** |
+
+Na prática, por dia:
+
+- Pergunta comum no modo **⚡ rápido**: cerca de **120 perguntas**.
+- Pergunta comum no modo **🎯 completo**: cerca de **70 perguntas**.
+- Com **documento grande anexado** (o teto é de 48 mil caracteres): cerca de
+  **20 a 25 perguntas**, nos dois modos — aqui o custo vem do documento lido,
+  não do modelo.
+
+Ou seja: se você passa o dia analisando documentos grandes, a cota acaba mesmo.
+Para esticar, anexe só as páginas que interessam e prefira o modo ⚡ rápido.
+O que **não** gasta nada de cota: gerar arquivos (Excel, Word, PDF), ler as
+respostas em voz alta, e ditar pelo microfone no Chrome/Edge.

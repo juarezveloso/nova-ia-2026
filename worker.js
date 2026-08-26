@@ -170,10 +170,10 @@ export default {
     // chega em ~1s e os dados continuam correndo, o que segura a conexão viva.
     if (body.fluxo) {
       try {
-        const fluxoIA = await env.AI.run(modeloEmUso, {
+        const r = await chamarIA(env, modeloEmUso, {
           messages: messages, max_tokens: 1200, stream: true,
         });
-        return new Response(montarFluxo(fluxoIA, fontes), {
+        return new Response(montarFluxo(r.resultado, fontes), {
           status: 200,
           headers: Object.assign({}, CORS, {
             'Content-Type': 'text/plain; charset=utf-8',
@@ -187,7 +187,9 @@ export default {
     }
 
     try {
-      let resultado = await env.AI.run(modeloEmUso, { messages, max_tokens: 1200 });
+      let r = await chamarIA(env, modeloEmUso, { messages, max_tokens: 1200 });
+      let resultado = r.resultado;
+      let modeloRespondeu = r.modelo;
       let resposta = (resultado.response || '');
       if (jaPesquisou) resposta = resposta.replace(/BUSCAR:.*/gi, '').trim();
 
@@ -211,19 +213,21 @@ export default {
             'Responda com o que você sabe e avise que não conseguiu confirmar dados atuais.\n' +
             'Pergunta: ' + perguntaOriginal;
 
-        resultado = await env.AI.run(modeloEmUso, { messages, max_tokens: 1200 });
+        r = await chamarIA(env, modeloEmUso, { messages, max_tokens: 1200 });
+        resultado = r.resultado; modeloRespondeu = r.modelo;
         resposta = (resultado.response || '').replace(/BUSCAR:.*/gi, '').trim();
 
         // Se os dados não serviram, o modelo às vezes devolve vazio: refazemos
         // a pergunta original em vez de deixar o usuário sem resposta.
         if (!resposta) {
           alvo.content = perguntaOriginal;
-          resultado = await env.AI.run(modeloEmUso, { messages, max_tokens: 1200 });
+          r = await chamarIA(env, modeloEmUso, { messages, max_tokens: 1200 });
+          resultado = r.resultado; modeloRespondeu = r.modelo;
           resposta = (resultado.response || '').replace(/BUSCAR:.*/gi, '').trim();
         }
       }
 
-      const saida = { reply: resposta, fontes: fontes, modelo: modeloEmUso };
+      const saida = { reply: resposta, fontes: fontes, modelo: modeloRespondeu };
       if (body.debug) saida.contexto = alvo ? alvo.content.slice(0, 1200) : null;
       return jsonResponse(saida, 200);
     } catch (e) {
@@ -257,7 +261,8 @@ async function analisarImagem(env, body, sistema) {
   const modelos = [MODELO_VISAO, MODELO_VISAO_RESERVA];
   for (let i = 0; i < modelos.length; i++) {
     try {
-      const resultado = await env.AI.run(modelos[i], { image: bytes, prompt, max_tokens: 1200 });
+      const r = await chamarIA(env, modelos[i], { image: bytes, prompt, max_tokens: 1200 }, null);
+      const resultado = r.resultado;
       const texto = resultado.response || resultado.description || resultado.text || '';
       return jsonResponse({ reply: texto, modelo: modelos[i] }, 200);
     } catch (e) {
@@ -713,12 +718,95 @@ function montarFluxo(fluxoIA, fontes) {
     },
   });
 }
-function descreverErro(e) {
+// Erros do Workers AI, pelos códigos oficiais da Cloudflare:
+// https://developers.cloudflare.com/workers-ai/platform/errors/
+//   3040 — sem capacidade no momento (passageiro: repetir na hora resolve)
+//   3036 / 4006 — cota diária da conta (só volta às 00:00 UTC)
+//   3007 / 3008 — tempo esgotado / abortado (passageiro)
+//   5016 — licença do modelo não aceita (definitivo, não adianta repetir)
+// Antes, um único teste (capacity|limit|quota|exceed|429) juntava tudo e
+// dizia "cota esgotada, volte amanhã" — inclusive para um soluço de meio
+// segundo, mandando o usuário embora sem motivo.
+function classificarErro(e) {
   const msg = e && e.message ? e.message : String(e);
-  if (/capacity|limit|quota|exceed|429/i.test(msg)) {
-    return 'A cota diária gratuita de IA parece ter acabado. Tente novamente amanhã. (' + msg + ')';
+  if (/\b3040\b|no more data centers|capacity temporarily exceeded|out of capacity/i.test(msg)) {
+    return { tipo: 'capacidade', msg: msg };
   }
-  return 'Falha no modelo de IA: ' + msg;
+  if (/\b(3036|4006)\b|daily free allocation|free allocation of|neuron/i.test(msg)) {
+    return { tipo: 'cota', msg: msg };
+  }
+  if (/\b(3007|3008)\b|timeout|timed out|aborted/i.test(msg)) {
+    return { tipo: 'tempo', msg: msg };
+  }
+  if (/\b5016\b|has not agreed|must submit the prompt/i.test(msg)) {
+    return { tipo: 'licenca', msg: msg };
+  }
+  return { tipo: 'outro', msg: msg };
+}
+
+function esperar(ms) {
+  return new Promise(function (pronto) { setTimeout(pronto, ms); });
+}
+
+// Uma tentativa só é frágil demais. A Cloudflare devolve 3040 por alguns
+// segundos quando os servidores do modelo enchem, e há um defeito conhecido e
+// muito relatado em que ela devolve "cota esgotada" com o painel marcando
+// 0 de 10.000 neurônios usados. Nos dois casos, repetir resolve — e, se o
+// modelo escolhido continuar sem capacidade, o outro modelo costuma atender.
+// Só depois disso é que desistimos e explicamos o motivo.
+const ESPERA_ENTRE_TENTATIVAS = [400, 1200];
+
+async function chamarIA(env, modelo, entrada, alternativo) {
+  // Por padrão, o plano B é o outro modelo de texto da lista.
+  const reserva = alternativo === undefined
+    ? (modelo === MODELOS.rapido ? MODELOS.completo : MODELOS.rapido)
+    : alternativo;
+  let ultimaFalha = null;
+
+  for (let i = 0; i < 3; i++) {
+    // Duas tentativas no modelo pedido; na terceira, o de reserva.
+    const usando = (i === 2 && reserva) ? reserva : modelo;
+    try {
+      return { resultado: await env.AI.run(usando, entrada), modelo: usando };
+    } catch (e) {
+      const falha = classificarErro(e);
+      ultimaFalha = e;
+      // Licença pendente, modelo inexistente, pedido inválido: repetir não muda nada.
+      if (falha.tipo === 'licenca' || falha.tipo === 'outro') throw e;
+      if (i < 2) await esperar(ESPERA_ENTRE_TENTATIVAS[i]);
+    }
+  }
+  throw ultimaFalha;
+}
+
+// A cota gratuita se renova às 00:00 UTC — 21h de Brasília, não "amanhã".
+function faltaParaRenovar() {
+  const agora = new Date();
+  const minutos = 24 * 60 - (agora.getUTCHours() * 60 + agora.getUTCMinutes());
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  if (h <= 0) return 'faltam ' + m + ' min';
+  return 'faltam cerca de ' + h + 'h' + (m ? ' ' + m + 'min' : '');
+}
+
+function descreverErro(e) {
+  const falha = classificarErro(e);
+  if (falha.tipo === 'cota') {
+    return 'A cota gratuita de IA do dia acabou (10.000 neurônios). Ela se renova ' +
+      'às 21h de Brasília — ' + faltaParaRenovar() + '. Já tentei de novo e com o ' +
+      'outro modelo, e a resposta foi a mesma.';
+  }
+  if (falha.tipo === 'capacidade') {
+    return 'Os servidores de IA estão sobrecarregados agora — isto não é a sua cota. ' +
+      'Tentei três vezes, inclusive no outro modelo. Espere alguns segundos e envie de novo.';
+  }
+  if (falha.tipo === 'tempo') {
+    return 'O modelo demorou demais para responder. Tente de novo, ou faça uma pergunta mais curta.';
+  }
+  if (falha.tipo === 'licenca') {
+    return 'O modelo exige aceitar a licença: abra /aceitar-licenca neste Worker.';
+  }
+  return 'Falha no modelo de IA: ' + falha.msg;
 }
 
 function jsonResponse(obj, status) {

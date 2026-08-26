@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nova IA 2026</title>
+<title>Bebi</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -706,7 +706,7 @@
 <body>
 
 <header>
-  <div class="avatar" id="rosto-ia" onclick="cutucarRosto()" title="Nova IA">
+  <div class="avatar" id="rosto-ia" onclick="cutucarRosto()" title="Bebi">
   <svg class="rosto" viewBox="0 0 100 100" aria-hidden="true">
     <g class="olho olho-esq">
       <ellipse cx="34" cy="42" rx="9" ry="11"/>
@@ -723,20 +723,20 @@
   </svg>
 </div>
   <div class="header-info">
-    <h1>Nova IA 2026</h1>
+    <h1>Bebi</h1>
     <p><span class="status-dot"></span>Online<span class="so-tela-larga"> — base atualizada até 2026</span></p>
   </div>
   <div id="velocidade">
     <button data-modelo="rapido" onclick="escolherVelocidade('rapido')" title="Respostas em poucos segundos, mais simples">⚡ rápido</button>
     <button data-modelo="completo" onclick="escolherVelocidade('completo')" title="Respostas melhores, porém mais lentas">🎯 completo</button>
   </div>
-  <button id="memoria-btn" onclick="alternarPainelMemoria()" title="O que a IA aprendeu sobre você">
+  <button id="memoria-btn" onclick="alternarPainelMemoria()" title="O que a Bebi aprendeu sobre você">
     🧠<span class="contador" id="memoria-contador">0</span>
   </button>
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.16</div>
+  <div class="badge">v2026.17</div>
 </header>
 
 
@@ -770,7 +770,7 @@
         <path class="boca" d="M34 64 Q50 78 66 64"/>
       </svg>
     </div>
-    <div class="bubble ai">Olá! Sou a Nova IA com base de conhecimento atualizada até 2026. Posso te ajudar com perguntas sobre tecnologia, ciência, eventos recentes, cultura e muito mais.
+    <div class="bubble ai">Olá! Eu sou a Bebi, sua assistente, com base de conhecimento atualizada até 2026. Posso te ajudar com perguntas sobre tecnologia, ciência, eventos recentes, cultura e muito mais.
 
 Como posso te ajudar hoje?</div>
   </div>
@@ -804,7 +804,7 @@ Como posso te ajudar hoje?</div>
 const WORKER_URL = 'https://nova-ia-2026.juarez-veloso.workers.dev';
 
 const history = [];
-const systemPrompt = `Você é uma IA assistente avançada chamada "Nova IA 2026", com base de conhecimento atualizada até maio de 2026. Você é inteligente, curiosa, direta e fala em português brasileiro de forma natural e amigável.
+const systemPrompt = `Você é uma assistente avançada chamada "Bebi", com base de conhecimento atualizada até maio de 2026. Você é inteligente, curiosa, direta e fala em português brasileiro de forma natural e amigável.
 
 Características:
 - Conhecimento atualizado sobre eventos, tecnologia, ciência, política, cultura e tendências até 2026
@@ -978,7 +978,7 @@ async function sendMessage() {
     if (!res.ok) {
       history.pop();
       const motivo = (data && data.error && data.error.message) ? data.error.message : ('código ' + res.status);
-      appendMessage('ai', 'O serviço de IA retornou um erro: ' + motivo);
+      appendMessage('ai', 'A Bebi encontrou um problema: ' + motivo);
     } else {
       const bruto = data.reply || 'Não consegui processar sua pergunta. Tente novamente.';
       const separado = separarAprendizado(bruto);
@@ -1012,7 +1012,7 @@ async function sendMessage() {
 
     appendMessage('ai', (e && (e.deTransporte || e.doModelo) && e.message)
       ? e.message
-      : 'Não consegui falar com o servidor de IA. Verifique sua conexão e tente de novo — seu texto foi preservado.');
+      : 'Não consegui falar com a Bebi. Verifique sua conexão e tente de novo — seu texto foi preservado.');
   }
 
   btn.disabled = false;
@@ -1843,7 +1843,7 @@ function montarSeletorDeVoz() {
 
 // Frase de amostra: tem número e entonação variada, o que ajuda a perceber
 // se a voz soa natural ou robótica.
-const FRASE_DE_TESTE = 'Olá! Eu sou a Nova IA. Esta é a minha voz. O orçamento total ficou em quinze mil e quatrocentos reais.';
+const FRASE_DE_TESTE = 'Olá! Eu sou a Bebi. Esta é a minha voz. O orçamento total ficou em quinze mil e quatrocentos reais.';
 
 // Os nomes das vozes no Android são genéricos ("voz I", "voz II"), então não
 // dá para saber pelo nome qual é melhor: o jeito é ouvir cada uma.
@@ -2493,7 +2493,7 @@ async function enviarAoServidor(corpo, tentativa) {
     }
     const erro = new Error(expirou
       ? 'A resposta demorou mais de 55 segundos. Pode ser a rede ou uma pergunta muito pesada — tente de novo, ou faça uma pergunta mais curta.'
-      : 'Não consegui falar com o servidor de IA. Verifique sua conexão e toque em enviar de novo — seu texto foi preservado.');
+      : 'Não consegui falar com a Bebi. Verifique sua conexão e toque em enviar de novo — seu texto foi preservado.');
     erro.deTransporte = true;
     throw erro;
   }
