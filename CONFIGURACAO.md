@@ -236,3 +236,43 @@ Armadilhas encontradas na montagem — anotadas para não repetir:
 - **Nunca devolver dado fora do assunto.** Quando a busca de notícias não
   encontrava nada, o código caía para as manchetes gerais — e a IA respondia
   sobre outro tema. Agora, sem resultado relevante, não vai notícia nenhuma.
+
+## Memória: como a IA "aprende"
+
+Sobre o pedido de "criar uma rede neural": o modelo **já é** uma rede neural
+(Llama 3.3, 70 bilhões de parâmetros). Treinar uma do zero custaria milhões em
+computação e daria um resultado muito pior. O que faz a IA aprender de verdade
+neste caso é **memória persistente** — e é isso que está implementado.
+
+Como funciona:
+
+1. Quando você conta algo duradouro (nome, profissão, cidade, como prefere as
+   respostas, projetos), o modelo acrescenta ao fim da resposta marcações
+   `[LEMBRAR: ...]`.
+2. A página retira essas marcações do texto exibido, guarda os fatos e mostra
+   um aviso discreto: *🧠 aprendi: ...*
+3. Em toda conversa seguinte, esses fatos vão junto nas instruções — então ela
+   te chama pelo nome e adapta os exemplos à sua área.
+
+O botão **🧠** no cabeçalho abre o painel com tudo o que ela sabe. Cada item
+tem um × para apagar, e há o botão **esquecer tudo**.
+
+Privacidade: a memória fica **só no navegador do visitante** (localStorage).
+Não vai para o servidor, não é compartilhada entre pessoas nem entre aparelhos.
+Cada visitante tem a sua. Limite de 40 fatos (os mais antigos saem primeiro),
+com proteção contra guardar o mesmo fato duas vezes.
+
+## A carinha
+
+O ícone "IA" virou um rostinho em SVG que reage ao que está acontecendo:
+
+| Estado | O que faz |
+|---|---|
+| parado | pisca de vez em quando |
+| pensando | olhos correm de um lado ao outro e a boca vira um traço |
+| falando | a boca abre e fecha junto com a voz |
+| ouvindo | olhos arregalados e leve balanço, com o microfone ligado |
+| contente | sorri ao receber uma resposta — e se você clicar nela |
+
+É SVG com animações em CSS: não usa imagem nem biblioteca, e por isso não pesa
+no carregamento.

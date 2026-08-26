@@ -564,22 +564,149 @@
   .fontes-msg a { display: block; color: var(--accent2); text-decoration: none;
     padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fontes-msg a:hover { text-decoration: underline; color: #fff; }
+
+  /* ── Carinha da IA ──────────────────────────────────────── */
+  .rosto { width: 100%; height: 100%; display: block; overflow: visible; }
+  .rosto .olho, .rosto .boca, .rosto .sobrancelha {
+    transform-box: fill-box; transform-origin: center;
+  }
+  .rosto .olho { fill: #fff; animation: piscar 5.5s infinite; }
+  .rosto .brilho { fill: rgba(255,255,255,0.9); }
+  .rosto .pupila { fill: #1b1b2f; }
+  .rosto .boca { fill: none; stroke: #fff; stroke-width: 6; stroke-linecap: round; }
+  .rosto .boca-aberta { fill: #1b1b2f; opacity: 0; }
+
+  @keyframes piscar {
+    0%, 90%, 100% { transform: scaleY(1); }
+    94% { transform: scaleY(0.08); }
+  }
+
+  /* pensando: olhos olham para cima e a boca vira um traço curto */
+  .avatar.pensando .pupila { animation: olhar 1.6s ease-in-out infinite; }
+  .avatar.pensando .boca { animation: boca-pensativa 1.6s ease-in-out infinite; }
+  @keyframes olhar {
+    0%, 100% { transform: translate(-2px, -3px); }
+    50% { transform: translate(2px, -3px); }
+  }
+  @keyframes boca-pensativa {
+    0%, 100% { transform: translateX(-3px) scaleX(0.5); }
+    50% { transform: translateX(3px) scaleX(0.5); }
+  }
+
+  /* falando: a boca abre e fecha */
+  .avatar.falando .boca { opacity: 0; }
+  .avatar.falando .boca-aberta { opacity: 1; animation: falar 0.36s ease-in-out infinite; }
+  @keyframes falar {
+    0%, 100% { transform: scaleY(0.35); }
+    50% { transform: scaleY(1.15); }
+  }
+
+  /* ouvindo: olhos arregalados e leve balanço */
+  .avatar.ouvindo { animation: balancar 1.4s ease-in-out infinite; }
+  .avatar.ouvindo .olho { animation: none; transform: scaleY(1.18); }
+  @keyframes balancar {
+    0%, 100% { transform: rotate(-4deg); }
+    50% { transform: rotate(4deg); }
+  }
+
+  /* contente: sorriso maior por um instante */
+  .avatar.contente .boca { animation: sorrir 0.9s ease-out; }
+  @keyframes sorrir {
+    0% { transform: scaleY(1); }
+    40% { transform: scaleY(1.6) translateY(1px); }
+    100% { transform: scaleY(1); }
+  }
+
+  .avatar { cursor: pointer; }
+  .msg-avatar.ai .rosto .boca { stroke-width: 7; }
+
+  /* ── Memória (o que a IA aprendeu) ──────────────────────── */
+  #memoria-btn {
+    background: transparent; border: 1px solid var(--border);
+    border-radius: 10px; width: 34px; height: 34px; margin-left: 8px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; position: relative; transition: all 0.2s;
+    font-size: 15px; line-height: 1;
+  }
+  #memoria-btn:hover { border-color: rgba(108,99,255,0.5); }
+  #memoria-btn .contador {
+    position: absolute; top: -6px; right: -6px;
+    background: var(--accent); color: #fff;
+    font-family: 'Space Mono', monospace; font-size: 9px;
+    min-width: 15px; height: 15px; border-radius: 8px;
+    display: none; align-items: center; justify-content: center; padding: 0 3px;
+  }
+  #memoria-btn .contador.tem { display: flex; }
+
+  #painel-memoria {
+    display: none; position: relative; z-index: 10;
+    padding: 12px 24px; border-bottom: 1px solid var(--border);
+    background: rgba(10,10,15,0.85); max-height: 32vh; overflow-y: auto;
+  }
+  #painel-memoria.aberto { display: block; }
+  .memoria-cabecalho {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);
+  }
+  .memoria-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 6px 0; font-size: 13px; line-height: 1.5;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+  .memoria-item span { flex: 1; }
+  .memoria-x {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px;
+  }
+  .memoria-x:hover { color: #ff7a7a; }
+  .memoria-vazia { color: var(--muted); font-size: 12px; font-style: italic; }
+
+  .aprendi {
+    margin-top: 8px; font-size: 11px; color: var(--accent2);
+    font-family: 'Space Mono', monospace;
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="avatar">IA</div>
+  <div class="avatar" id="rosto-ia" onclick="cutucarRosto()" title="Nova IA">
+  <svg class="rosto" viewBox="0 0 100 100" aria-hidden="true">
+    <g class="olho olho-esq">
+      <ellipse cx="34" cy="42" rx="9" ry="11"/>
+      <circle class="pupila" cx="34" cy="43" r="4.5"/>
+      <circle class="brilho" cx="36" cy="39" r="1.8"/>
+    </g>
+    <g class="olho olho-dir">
+      <ellipse cx="66" cy="42" rx="9" ry="11"/>
+      <circle class="pupila" cx="66" cy="43" r="4.5"/>
+      <circle class="brilho" cx="68" cy="39" r="1.8"/>
+    </g>
+    <ellipse class="boca-aberta" cx="50" cy="68" rx="12" ry="9"/>
+    <path class="boca" d="M34 64 Q50 78 66 64"/>
+  </svg>
+</div>
   <div class="header-info">
     <h1>Nova IA 2026</h1>
     <p><span class="status-dot"></span>Online<span class="so-tela-larga"> — base atualizada até 2026</span></p>
   </div>
+  <button id="memoria-btn" onclick="alternarPainelMemoria()" title="O que a IA aprendeu sobre você">
+    🧠<span class="contador" id="memoria-contador">0</span>
+  </button>
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.11</div>
+  <div class="badge">v2026.13</div>
 </header>
 
+
+<div id="painel-memoria">
+  <div class="memoria-cabecalho">
+    <span>🧠 O que aprendi sobre você (fica salvo só neste navegador)</span>
+    <button class="btn-baixar" onclick="esquecerTudo()">esquecer tudo</button>
+  </div>
+  <div id="memoria-lista"></div>
+</div>
 
 <div id="barra-voz">
   <span>🔊 Voz:</span>
@@ -596,7 +723,13 @@
   </div>
 
   <div class="msg-row">
-    <div class="msg-avatar ai">IA</div>
+    <div class="msg-avatar ai">
+      <svg class="rosto" viewBox="0 0 100 100" aria-hidden="true">
+        <g class="olho"><ellipse cx="34" cy="42" rx="9" ry="11"/><circle class="pupila" cx="34" cy="43" r="4.5"/></g>
+        <g class="olho"><ellipse cx="66" cy="42" rx="9" ry="11"/><circle class="pupila" cx="66" cy="43" r="4.5"/></g>
+        <path class="boca" d="M34 64 Q50 78 66 64"/>
+      </svg>
+    </div>
     <div class="bubble ai">Olá! Sou a Nova IA com base de conhecimento atualizada até 2026. Posso te ajudar com perguntas sobre tecnologia, ciência, eventos recentes, cultura e muito mais.
 
 Como posso te ajudar hoje?</div>
@@ -641,6 +774,16 @@ Características:
 - Tem acesso a informação atual da internet: notícias, cotações e páginas da web
 - Mantém respostas concisas (máximo 3-4 parágrafos)
 - Não usa asteriscos para negrito no meio do texto
+
+MEMÓRIA
+Quando a pessoa contar algo duradouro sobre ela — nome, profissão, empresa, cidade,
+como prefere as respostas, projetos em que trabalha, gostos — acrescente no fim da
+sua resposta uma marcação por fato, assim:
+[LEMBRAR: o nome dele é Juarez]
+[LEMBRAR: trabalha com TI numa construtora]
+Registre só o que vale para conversas futuras. Nada de assunto passageiro, nada de
+senha ou dado sensível. A marcação não aparece para a pessoa: escreva a resposta
+normalmente e deixe as marcações por último.
 
 GERAÇÃO DE ARQUIVOS
 Quando o usuário pedir um arquivo (planilha, documento, relatório, lista para baixar),
@@ -689,6 +832,7 @@ function suggest(text) {
 
 async function sendMessage() {
   pararFala();              // silencia a leitura anterior
+  rosto(null);
   if (ouvindo) pararVoz();  // encerra o ditado antes de enviar
 
   const input = document.getElementById('user-input');
@@ -743,10 +887,11 @@ async function sendMessage() {
   sobras.forEach(function (s) { anexos.push(s); });
   renderizarAnexos();
 
+  rosto('pensando');
   const typingEl = appendTyping();
 
   try {
-    const corpo = { system: systemPrompt, messages: history };
+    const corpo = { system: promptComMemoria(), messages: history };
     if (imagem) corpo.image = imagem.base64;
 
     const res = await fetch(WORKER_URL, {
@@ -763,9 +908,15 @@ async function sendMessage() {
       const motivo = (data && data.error && data.error.message) ? data.error.message : ('código ' + res.status);
       appendMessage('ai', 'O serviço de IA retornou um erro: ' + motivo);
     } else {
-      const reply = data.reply || 'Não consegui processar sua pergunta. Tente novamente.';
+      const bruto = data.reply || 'Não consegui processar sua pergunta. Tente novamente.';
+      const separado = separarAprendizado(bruto);
+      const reply = separado.texto || bruto;
+
+      const aprendidos = separado.fatos.filter(aprender);
+
       history.push({ role: 'assistant', content: reply });
-      appendMessage('ai', reply, data.fontes);
+      rosto('contente', 1200);
+      appendMessage('ai', reply, data.fontes, aprendidos);
       if (sobras.length) {
         appendMessage('ai', 'Consigo analisar uma imagem por vez. Ainda há ' + sobras.length +
           ' anexada(s) — é só enviar de novo para eu continuar.');
@@ -781,14 +932,15 @@ async function sendMessage() {
   input.focus();
 }
 
-function appendMessage(role, text, fontes) {
+function appendMessage(role, text, fontes, aprendidos) {
   const msgs = document.getElementById('messages');
   const row = document.createElement('div');
   row.className = `msg-row ${role}`;
 
   const av = document.createElement('div');
   av.className = `msg-avatar ${role}`;
-  av.textContent = role === 'ai' ? 'IA' : 'EU';
+  if (role === 'ai') av.innerHTML = SVG_ROSTINHO;
+  else av.textContent = 'EU';
 
   const bubble = document.createElement('div');
   bubble.className = `bubble ${role}`;
@@ -801,6 +953,13 @@ function appendMessage(role, text, fontes) {
   msgs.scrollTop = msgs.scrollHeight;
 
   if (fontes && fontes.length) bubble.appendChild(criarListaDeFontes(fontes));
+
+  if (aprendidos && aprendidos.length) {
+    const aviso = document.createElement('div');
+    aviso.className = 'aprendi';
+    aviso.textContent = '🧠 aprendi: ' + aprendidos.join(' • ');
+    bubble.appendChild(aviso);
+  }
 
   if (role === 'ai') falar(textoParaFala(text)); // lê em voz alta, sem a marcação
 }
@@ -833,7 +992,7 @@ function appendTyping() {
 
   const av = document.createElement('div');
   av.className = 'msg-avatar ai';
-  av.textContent = 'IA';
+  av.innerHTML = SVG_ROSTINHO;
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble ai';
@@ -1247,6 +1406,7 @@ function alternarVoz() {
 function iniciarVoz() {
   ouvindo = true;
   marcarBotaoVoz(true);
+  rosto('ouvindo');
   if (RECONHECIMENTO_NATIVO) {
     mostrarStatusVoz('🎤 Ouvindo… fale à vontade (clique no microfone para parar)');
     iniciarReconhecimentoNativo();
@@ -1258,6 +1418,7 @@ function iniciarVoz() {
 
 function pararVoz(jaEncerrou) {
   ouvindo = false;
+  rosto(null);
   idSessaoVoz++; // qualquer evento atrasado do reconhecedor antigo é ignorado
   marcarBotaoVoz(false);
   registrarVoz('PAROU');
@@ -1695,6 +1856,10 @@ function falar(texto) {
     fala.rate = 0.97;   // um pouco mais calmo soa mais humano
     fala.pitch = 1;
     fala.volume = 1;
+    fala.onstart = function () { rosto('falando'); };
+    fala.onend = function () {
+      if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) rosto(null);
+    };
     try { window.speechSynthesis.speak(fala); } catch (e) {}
   });
 }
@@ -2059,6 +2224,156 @@ function textoParaFala(texto) {
     .join('\n');
 }
 
+
+// ── Carinha da IA ─────────────────────────────────────────────────────────
+// Um rostinho em SVG que reage ao que está acontecendo: pensa enquanto a
+// resposta vem, fala junto com a voz, e escuta quando o microfone está ligado.
+const SVG_ROSTINHO =
+  '<svg class="rosto" viewBox="0 0 100 100" aria-hidden="true">' +
+  '<g class="olho"><ellipse cx="34" cy="42" rx="9" ry="11"/>' +
+  '<circle class="pupila" cx="34" cy="43" r="4.5"/></g>' +
+  '<g class="olho"><ellipse cx="66" cy="42" rx="9" ry="11"/>' +
+  '<circle class="pupila" cx="66" cy="43" r="4.5"/></g>' +
+  '<path class="boca" d="M34 64 Q50 78 66 64"/></svg>';
+
+const ESTADOS_ROSTO = ['pensando', 'falando', 'ouvindo', 'contente'];
+let temporizadorRosto = null;
+
+// estado: null (parado), "pensando", "falando", "ouvindo" ou "contente"
+function rosto(estado, duracao) {
+  const el = document.getElementById('rosto-ia');
+  if (!el) return;
+  clearTimeout(temporizadorRosto);
+  ESTADOS_ROSTO.forEach(function (e) { el.classList.remove(e); });
+  if (estado) el.classList.add(estado);
+  if (duracao) {
+    temporizadorRosto = setTimeout(function () { rosto(null); }, duracao);
+  }
+}
+
+// Um agrado: clicar na carinha faz ela sorrir.
+function cutucarRosto() {
+  rosto('contente', 900);
+}
+
+// ── Memória: é isto que faz a IA "aprender" ───────────────────────────────
+// Não é uma rede neural nova (ela já é uma): é o contexto que ela carrega
+// de uma conversa para a outra. Fica guardado só no navegador do visitante.
+const CHAVE_MEMORIA = 'novaia-memoria';
+const LIMITE_MEMORIA = 40;
+const REGEX_LEMBRAR = /\[LEMBRAR:\s*([^\]]{3,200})\]/gi;
+let memoria = [];
+
+function normalizarFato(s) {
+  return String(s).toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function carregarMemoria() {
+  try {
+    const bruto = lerPreferencia(CHAVE_MEMORIA);
+    memoria = bruto ? JSON.parse(bruto) : [];
+    if (!Array.isArray(memoria)) memoria = [];
+  } catch (e) { memoria = []; }
+  atualizarContadorMemoria();
+}
+
+function salvarMemoria() {
+  salvarPreferencia(CHAVE_MEMORIA, JSON.stringify(memoria.slice(-LIMITE_MEMORIA)));
+  atualizarContadorMemoria();
+}
+
+function aprender(fato) {
+  const limpo = String(fato).replace(/\s+/g, ' ').trim();
+  if (limpo.length < 3 || limpo.length > 200) return false;
+  const chave = normalizarFato(limpo);
+  if (!chave) return false;
+  // não guarda o mesmo fato duas vezes, nem versões quase iguais
+  for (let i = 0; i < memoria.length; i++) {
+    const outro = normalizarFato(memoria[i]);
+    if (outro === chave || outro.indexOf(chave) !== -1 || chave.indexOf(outro) !== -1) return false;
+  }
+  memoria.push(limpo);
+  while (memoria.length > LIMITE_MEMORIA) memoria.shift();
+  salvarMemoria();
+  return true;
+}
+
+function esquecer(indice) {
+  memoria.splice(indice, 1);
+  salvarMemoria();
+  desenharMemoria();
+}
+
+function esquecerTudo() {
+  if (!memoria.length) return;
+  memoria = [];
+  salvarMemoria();
+  desenharMemoria();
+}
+
+function atualizarContadorMemoria() {
+  const c = document.getElementById('memoria-contador');
+  if (!c) return;
+  c.textContent = memoria.length;
+  c.classList.toggle('tem', memoria.length > 0);
+}
+
+function desenharMemoria() {
+  const lista = document.getElementById('memoria-lista');
+  if (!lista) return;
+  lista.innerHTML = '';
+  if (!memoria.length) {
+    const vazio = document.createElement('div');
+    vazio.className = 'memoria-vazia';
+    vazio.textContent = 'Ainda não aprendi nada sobre você. Conte seu nome, seu trabalho ' +
+      'ou como prefere as respostas, e eu passo a lembrar nas próximas conversas.';
+    lista.appendChild(vazio);
+    return;
+  }
+  memoria.forEach(function (fato, i) {
+    const linha = document.createElement('div');
+    linha.className = 'memoria-item';
+    const texto = document.createElement('span');
+    texto.textContent = fato;
+    const x = document.createElement('button');
+    x.className = 'memoria-x';
+    x.textContent = '×';
+    x.title = 'Esquecer isto';
+    x.onclick = function () { esquecer(i); };
+    linha.appendChild(texto);
+    linha.appendChild(x);
+    lista.appendChild(linha);
+  });
+}
+
+function alternarPainelMemoria() {
+  const p = document.getElementById('painel-memoria');
+  p.classList.toggle('aberto');
+  if (p.classList.contains('aberto')) desenharMemoria();
+}
+
+// Separa os fatos marcados com [LEMBRAR: ...] do texto que aparece na tela
+function separarAprendizado(texto) {
+  const fatos = [];
+  let achado;
+  REGEX_LEMBRAR.lastIndex = 0;
+  while ((achado = REGEX_LEMBRAR.exec(texto)) !== null) fatos.push(achado[1]);
+  return { texto: texto.replace(REGEX_LEMBRAR, '').replace(/\n{3,}/g, '\n\n').trim(), fatos: fatos };
+}
+
+// Monta as instruções já com o que a IA sabe sobre esta pessoa
+function promptComMemoria() {
+  if (!memoria.length) return systemPrompt;
+  return systemPrompt + '\n\nO QUE VOCÊ JÁ SABE SOBRE ESTA PESSOA\n' +
+    memoria.map(function (f) { return '- ' + f; }).join('\n') +
+    '\n\nAdapte as respostas a este contexto: use exemplos, vocabulário e nível de ' +
+    'detalhe que façam sentido para a área e as preferências dela. Chame a pessoa ' +
+    'pelo nome quando couber. Não repita a lista de volta, não diga que está ' +
+    'lembrando, e NÃO gere [LEMBRAR] para nada que já esteja na lista acima.';
+}
+
+carregarMemoria();
 </script>
 </body>
 </html>
