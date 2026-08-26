@@ -307,7 +307,8 @@ inclusive acertando o INCC. Use o completo em perguntas de raciocínio mais long
 
 Modelos testados e descartados:
 
--  — **descontinuado** pela Cloudflare em 30/05/2026
-  (retornava erro 5028; resposta chegava vazia na tela).
--  — rápido, mas **errou o INCC** (disse ser índice
-  de preços ao consumidor) e truncou uma conta no meio. Fora da lista de propósito.
+- **Llama 3.1 8B** (`@cf/meta/llama-3.1-8b-instruct`) — **descontinuado** pela
+  Cloudflare em 30/05/2026. Retorna erro 5028 e a resposta chegava vazia na tela.
+- **Llama 3.2 3B** (`@cf/meta/llama-3.2-3b-instruct`) — o mais veloz, mas **errou
+  o INCC** (disse ser índice de preços ao consumidor, quando é de custo da
+  construção) e truncou uma conta no meio. Fora da lista de propósito.
