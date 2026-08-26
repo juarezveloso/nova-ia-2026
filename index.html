@@ -557,6 +557,135 @@
     .cartao-previa { font-size: 9px; }
   }
 
+  /* ── Painel lateral de conversas ────────────────────────── */
+  #menu-btn {
+    background: transparent; border: none; padding: 0; margin-right: 2px;
+    width: 34px; height: 34px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 8px; font-size: 18px;
+    color: var(--muted); transition: all 0.2s;
+  }
+  #menu-btn:hover { background: rgba(108,99,255,0.15); color: var(--accent2); }
+
+  #painel-fundo {
+    position: fixed; inset: 0; z-index: 90;
+    background: rgba(0,0,0,0.55); opacity: 0; pointer-events: none;
+    transition: opacity 0.22s;
+  }
+  #painel-fundo.aberto { opacity: 1; pointer-events: auto; }
+
+  #painel {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 91;
+    width: 290px; max-width: 84vw;
+    display: flex; flex-direction: column;
+    background: var(--surface); border-right: 1px solid var(--border);
+    transform: translateX(-102%); transition: transform 0.22s ease;
+  }
+  #painel.aberto { transform: translateX(0); }
+
+  .painel-topo {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 12px 10px 16px; border-bottom: 1px solid var(--border);
+  }
+  .painel-titulo { font-weight: 700; font-size: 14px; color: var(--text); }
+  .painel-x {
+    background: transparent; border: none; color: var(--muted);
+    font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px;
+  }
+  .painel-x:hover { color: var(--text); }
+
+  #nova-conversa {
+    margin: 12px; padding: 10px 12px; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    color: #fff; border: none; border-radius: 10px;
+    font-family: inherit; font-size: 13px; font-weight: 700;
+    text-align: left; transition: transform 0.15s;
+  }
+  #nova-conversa:active { transform: scale(0.98); }
+
+  #lista-conversas { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+  .painel-secao {
+    padding: 10px 8px 5px; font-family: 'Space Mono', monospace;
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .painel-vazio {
+    padding: 18px 10px; font-size: 12px; color: var(--muted); line-height: 1.6;
+  }
+  .painel-rodape {
+    padding: 10px 16px 14px; border-top: 1px solid var(--border);
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    color: var(--muted); line-height: 1.5;
+  }
+
+  .conversa {
+    display: flex; align-items: center; gap: 2px;
+    border-radius: 9px; transition: background 0.15s;
+  }
+  .conversa:hover { background: rgba(108,99,255,0.10); }
+  .conversa.atual { background: rgba(108,99,255,0.18); }
+  .conversa-abrir {
+    flex: 1; min-width: 0; text-align: left; cursor: pointer;
+    background: transparent; border: none; padding: 9px 8px;
+    font-family: inherit; color: var(--text);
+  }
+  .conversa-titulo {
+    font-size: 12.5px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; margin-bottom: 2px;
+  }
+  .conversa-data {
+    font-family: 'Space Mono', monospace; font-size: 9.5px; color: var(--muted);
+  }
+  .conversa-acoes { display: flex; gap: 1px; padding-right: 4px; }
+  .conversa-acoes button {
+    background: transparent; border: none; cursor: pointer;
+    padding: 4px 5px; font-size: 12px; border-radius: 6px;
+    opacity: 0.5; transition: opacity 0.15s;
+  }
+  .conversa-acoes button:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+
+  /* ── Miniatura do anexo ─────────────────────────────────── */
+  .chip-miniatura {
+    width: 34px; height: 34px; flex-shrink: 0;
+    object-fit: cover; border-radius: 6px;
+    border: 1px solid var(--border); background: #fff;
+  }
+
+  /* ── Blocos de código ───────────────────────────────────── */
+  .codigo-bloco {
+    margin: 10px 0; border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; background: rgba(0,0,0,0.35);
+  }
+  .codigo-topo {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 5px 8px 5px 12px;
+    background: rgba(255,255,255,0.04); border-bottom: 1px solid var(--border);
+  }
+  .codigo-lang {
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    color: var(--muted); text-transform: lowercase;
+  }
+  .codigo-copiar {
+    background: transparent; color: var(--accent2);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 3px 9px; cursor: pointer;
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    transition: all 0.2s; flex-shrink: 0;
+  }
+  .codigo-copiar:hover { border-color: var(--accent); background: rgba(108,99,255,0.18); }
+  .codigo-copiar:active { transform: scale(0.95); }
+  .codigo-corpo {
+    margin: 0; padding: 12px; overflow-x: auto;
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    line-height: 1.65; color: #e8e8f0; white-space: pre;
+  }
+
+  /* ── Passo a passo enquanto a Bebi trabalha ─────────────── */
+  .passo-atual {
+    margin-top: 8px; font-family: 'Space Mono', monospace;
+    font-size: 11px; color: var(--muted); line-height: 1.5;
+  }
+
   /* ── Imagens geradas e tratadas ─────────────────────────── */
   .img-msg { margin-top: 10px; }
   .img-msg img {
@@ -729,7 +858,19 @@
 </head>
 <body>
 
+<div id="painel-fundo" onclick="fecharPainel()"></div>
+<aside id="painel">
+  <div class="painel-topo">
+    <span class="painel-titulo">Conversas</span>
+    <button class="painel-x" onclick="fecharPainel()" title="Fechar">&times;</button>
+  </div>
+  <button id="nova-conversa" onclick="novaConversa()">+ Nova conversa</button>
+  <div id="lista-conversas"></div>
+  <div class="painel-rodape">Guardadas só neste aparelho — não vão para servidor nenhum.</div>
+</aside>
+
 <header>
+  <button id="menu-btn" onclick="alternarPainel()" title="Suas conversas">&#9776;</button>
   <div class="avatar" id="rosto-ia" onclick="cutucarRosto()" title="Bebi">
   <svg class="rosto" viewBox="0 0 100 100" aria-hidden="true">
     <g class="olho olho-esq">
@@ -760,7 +901,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.19</div>
+  <div class="badge">v2026.20</div>
 </header>
 
 
@@ -971,6 +1112,10 @@ async function sendMessage() {
 
   rosto('pensando');
   const typingEl = appendTyping();
+  passo(typingEl, imagem ? '👁️ olhando a imagem…'
+    : documentos.length ? '📄 lendo o documento…'
+    : PARECE_TEMPO_REAL.test(texto) ? '🌐 consultando dados atuais…'
+    : '💭 pensando…');
 
   try {
     const corpo = { system: promptComMemoria(), messages: history, modelo: modeloEscolhido, fluxo: true };
@@ -1090,7 +1235,10 @@ function appendMessage(role, text, fontes, aprendidos) {
     bubble.appendChild(aviso);
   }
 
-  if (role === 'ai') falar(textoParaFala(text)); // lê em voz alta, sem a marcação
+  // Ao restaurar uma conversa antiga não relemos tudo em voz alta nem
+  // regravamos o que já está guardado.
+  if (role === 'ai' && !restaurando) falar(textoParaFala(text));
+  registrarLinha(role, text);
 }
 
 // Mostra de onde a IA tirou a informação, para dar para conferir.
@@ -1125,7 +1273,8 @@ function appendTyping() {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble ai';
-  bubble.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  bubble.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>' +
+    '<div class="passo-atual" hidden></div>';
 
   row.appendChild(av);
   row.appendChild(bubble);
@@ -1133,6 +1282,22 @@ function appendTyping() {
   msgs.scrollTop = msgs.scrollHeight;
   return row;
 }
+
+// Diz o que está acontecendo agora, em vez de deixar só o pontinho piscando.
+// Só anuncia o que realmente vai acontecer — nada de etapa inventada.
+function passo(linha, texto) {
+  if (!linha) return;
+  const el = linha.querySelector('.passo-atual');
+  if (!el) return;
+  el.textContent = texto || '';
+  el.hidden = !texto;
+  const msgs = document.getElementById('messages');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// Espelha o gatilho de busca do Worker. Se um dia os dois divergirem, o pior
+// que acontece é o aviso ficar genérico — a busca em si não depende disto.
+const PARECE_TEMPO_REAL = /ptax|d[óo]lar|dolar|euro|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|selic|ipca|incc|infla[çc][ãa]o|juros|ibovespa|b[óo]lsa|not[íi]cia|[úu]ltimas|hoje|agora|atual|recente|pre[çc]o|quanto (est[áa]|custa)|o que (aconteceu|houve)|https?:\/\//i;
 
 // ── Anexos: leitura de documentos de vários formatos ──────────────────────
 const anexos = [];
@@ -1366,12 +1531,22 @@ function renderizarAnexos() {
     const chip = document.createElement('div');
     chip.className = 'chip' + (a.status === 'erro' ? ' erro' : '');
 
-    const icone = document.createElement('span');
-    icone.className = 'chip-icone';
-    icone.textContent = a.status === 'lendo' ? '⏳'
-      : a.status === 'erro' ? '⚠️'
-      : a.tipo === 'imagem' ? '🖼️' : '📄';
-    if (a.status === 'lendo') icone.classList.add('girando');
+    // Imagem pronta vira miniatura de verdade: dá para conferir se é o
+    // arquivo certo antes de enviar, em vez de confiar só no nome.
+    let icone;
+    if (a.tipo === 'imagem' && a.base64 && a.status === 'pronto') {
+      icone = document.createElement('img');
+      icone.className = 'chip-miniatura';
+      icone.src = 'data:image/jpeg;base64,' + a.base64;
+      icone.alt = a.nome;
+    } else {
+      icone = document.createElement('span');
+      icone.className = 'chip-icone';
+      icone.textContent = a.status === 'lendo' ? '⏳'
+        : a.status === 'erro' ? '⚠️'
+        : a.tipo === 'imagem' ? '🖼️' : '📄';
+      if (a.status === 'lendo') icone.classList.add('girando');
+    }
 
     const bloco = document.createElement('div');
     bloco.className = 'chip-texto';
@@ -2296,6 +2471,69 @@ function baixarBlob(blob, nome) {
   setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
 }
 
+// ── Blocos de código ──────────────────────────────────────────────────────
+function criarBlocoCodigo(linguagem, codigo) {
+  const caixa = document.createElement('div');
+  caixa.className = 'codigo-bloco';
+
+  const topo = document.createElement('div');
+  topo.className = 'codigo-topo';
+  const rotulo = document.createElement('span');
+  rotulo.className = 'codigo-lang';
+  rotulo.textContent = linguagem || 'texto';
+  const botao = document.createElement('button');
+  botao.className = 'codigo-copiar';
+  botao.textContent = '⧉ copiar';
+  botao.onclick = function () { copiarTexto(codigo, botao); };
+  topo.appendChild(rotulo);
+  topo.appendChild(botao);
+
+  const pre = document.createElement('pre');
+  pre.className = 'codigo-corpo';
+  const corpo = document.createElement('code');
+  corpo.textContent = codigo;
+  pre.appendChild(corpo);
+
+  caixa.appendChild(topo);
+  caixa.appendChild(pre);
+  return caixa;
+}
+
+// navigator.clipboard exige HTTPS e pode estar bloqueado; o campo escondido
+// é o caminho que funciona em qualquer navegador, inclusive nos antigos do
+// Android. Por isso um serve de reserva para o outro.
+function copiarTexto(texto, botao) {
+  function avisar(deuCerto) {
+    const antes = botao.textContent;
+    botao.textContent = deuCerto ? '✓ copiado' : '✕ não deu';
+    setTimeout(function () { botao.textContent = antes; }, 1600);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(
+      function () { avisar(true); },
+      function () { avisar(copiarPeloCampo(texto)); });
+    return;
+  }
+  avisar(copiarPeloCampo(texto));
+}
+
+function copiarPeloCampo(texto) {
+  try {
+    const campo = document.createElement('textarea');
+    campo.value = texto;
+    campo.setAttribute('readonly', '');
+    campo.style.position = 'fixed';
+    campo.style.left = '-9999px';
+    document.body.appendChild(campo);
+    campo.select();
+    const deuCerto = document.execCommand('copy');
+    document.body.removeChild(campo);
+    return deuCerto;
+  } catch (e) {
+    return false;
+  }
+}
+
 // ── Montagem da resposta ──────────────────────────────────────────────────
 function despejarTexto(destino, linhas) {
   const texto = linhas.join('\n').replace(/^\n+|\n+$/g, '');
@@ -2310,6 +2548,21 @@ function renderizarTextoETabelas(destino, texto) {
   let acumulado = [];
   let i = 0;
   while (i < linhas.length) {
+    // Bloco cercado por crases vira caixa de código com botão de copiar.
+    // Os blocos ```arquivo:nome.ext já foram retirados antes daqui, então o
+    // que sobra é código de verdade.
+    const cerca = linhas[i].match(/^\s*```\s*([a-z0-9+#.-]*)\s*$/i);
+    if (cerca) {
+      despejarTexto(destino, acumulado);
+      acumulado = [];
+      i++;
+      const codigo = [];
+      while (i < linhas.length && !/^\s*```\s*$/.test(linhas[i])) { codigo.push(linhas[i]); i++; }
+      i++;   // pula a cerca de fechamento
+      destino.appendChild(criarBlocoCodigo(cerca[1], codigo.join('\n')));
+      continue;
+    }
+
     const proxima = linhas[i + 1];
     if (ehLinhaDeTabela(linhas[i]) && proxima && ehSeparadorDeTabela(proxima)) {
       despejarTexto(destino, acumulado);
@@ -2347,6 +2600,7 @@ function renderizarResposta(destino, texto) {
 function textoParaFala(texto) {
   return String(texto)
     .replace(REGEX_BLOCO_ARQUIVO, ' Arquivo $1 pronto para baixar. ')
+    .replace(/```[\s\S]*?```/g, ' Bloco de código na tela. ')
     .split('\n')
     .filter(function (l) { return !ehSeparadorDeTabela(l); })
     .map(function (l) { return ehLinhaDeTabela(l) ? celulasDaLinha(l).join(', ') : l; })
@@ -2441,6 +2695,12 @@ async function desenharNaConversa(pedido, origemBase64) {
 
   rosto('pensando');
   const typingEl = appendTyping();
+  passo(typingEl, origemBase64 ? '👁️ olhando a sua imagem…' : '🎨 preparando o desenho…');
+  // O Worker traduz o pedido para inglês antes de desenhar; o desenho em si
+  // é a parte demorada, então o aviso troca depois de ~2s.
+  const relogioDoPasso = setTimeout(function () {
+    passo(typingEl, origemBase64 ? '🎨 redesenhando…' : '🎨 desenhando…');
+  }, 2000);
   try {
     const corpo = { desenhar: texto };
     if (origemBase64) { corpo.origem = origemBase64; corpo.forca = 0.6; }
@@ -2448,6 +2708,7 @@ async function desenharNaConversa(pedido, origemBase64) {
     const res = await enviarAoServidor(corpo);
     let dados = null;
     try { dados = await res.json(); } catch (e) { /* resposta ilegível */ }
+    clearTimeout(relogioDoPasso);
     typingEl.remove();
 
     if (!res.ok || !dados || !dados.imagem) {
@@ -2461,6 +2722,7 @@ async function desenharNaConversa(pedido, origemBase64) {
     mostrarImagem('data:' + (dados.tipo || 'image/jpeg') + ';base64,' + dados.imagem,
       dados, texto);
   } catch (e) {
+    clearTimeout(relogioDoPasso);
     typingEl.remove();
     appendMessage('ai', (e && e.message) ||
       'Não consegui desenhar. Tente de novo em alguns segundos.');
@@ -2505,6 +2767,12 @@ function mostrarImagem(dataUrl, dados, pedido) {
   row.appendChild(bolha);
   msgs.appendChild(row);
   msgs.scrollTop = msgs.scrollHeight;
+
+  // A imagem em si não é guardada: cada uma passa de 300 KB em base64 e
+  // estouraria a cota do navegador em poucas conversas. Fica o registro do
+  // que foi desenhado, e a imagem continua na tela até você sair.
+  registrarLinha('ai', '🎨 [imagem gerada: ' +
+    ((dados && dados.prompt) || pedido || 'sem descrição') + ']');
 }
 
 // Tratamentos locais. Servem principalmente para foto de documento tirada em
@@ -2733,6 +3001,290 @@ function promptComMemoria() {
 }
 
 carregarMemoria();
+
+// ── Conversas guardadas (painel lateral) ──────────────────────────────────
+// Tudo isto vive no navegador do visitante: nenhuma conversa vai para
+// servidor nenhum. Guardamos duas coisas por conversa — as linhas que
+// aparecem na tela e o contexto que a IA recebe —, porque as duas são
+// diferentes: a tela mostra "📎 orcamento.pdf", enquanto o contexto carrega
+// o documento inteiro.
+const CHAVE_CONVERSAS = 'novaia-conversas';
+const LIMITE_CONVERSAS = 40;
+const LIMITE_GUARDADO = 4000;   // caracteres por mensagem guardada
+
+let conversas = [];
+let idAtual = null;
+let linhasDaConversa = [];
+let restaurando = false;
+let telaInicial = '';
+
+function cortarParaGuardar(texto) {
+  const t = String(texto == null ? '' : texto);
+  return t.length > LIMITE_GUARDADO
+    ? t.slice(0, LIMITE_GUARDADO) + '\n[…cortado ao guardar…]'
+    : t;
+}
+
+function carregarConversas() {
+  try {
+    const cru = localStorage.getItem(CHAVE_CONVERSAS);
+    conversas = cru ? JSON.parse(cru) : [];
+    if (!Array.isArray(conversas)) conversas = [];
+  } catch (e) {
+    conversas = [];   // armazenamento bloqueado ou dado corrompido
+  }
+}
+
+// O armazenamento do navegador tem teto (por volta de 5 MB) e pode nem
+// existir em aba anônima. Quando estoura, descartamos as conversas mais
+// antigas em vez de perder a atual, que é a que está em uso.
+function salvarConversas() {
+  for (let tentativa = 0; tentativa < 6; tentativa++) {
+    try {
+      localStorage.setItem(CHAVE_CONVERSAS, JSON.stringify(conversas));
+      return true;
+    } catch (e) {
+      const descartaveis = conversas.filter(function (c) {
+        return !c.fixada && c.id !== idAtual;
+      });
+      if (!descartaveis.length) return false;
+      let maisAntiga = descartaveis[0];
+      descartaveis.forEach(function (c) {
+        if ((c.atualizadaEm || 0) < (maisAntiga.atualizadaEm || 0)) maisAntiga = c;
+      });
+      conversas = conversas.filter(function (c) { return c !== maisAntiga; });
+    }
+  }
+  return false;
+}
+
+function registrarLinha(papel, texto) {
+  if (restaurando) return;
+  linhasDaConversa.push({ papel: papel, texto: cortarParaGuardar(texto) });
+  salvarConversaAtual();
+}
+
+function salvarConversaAtual() {
+  if (!linhasDaConversa.length) return;
+
+  let atual = null;
+  for (let i = 0; i < conversas.length; i++) {
+    if (conversas[i].id === idAtual) { atual = conversas[i]; break; }
+  }
+  if (!atual) {
+    atual = { id: idAtual || String(Date.now()), fixada: false, renomeada: false };
+    idAtual = atual.id;
+    conversas.unshift(atual);
+  }
+
+  if (!atual.renomeada) {
+    let primeira = '';
+    for (let i = 0; i < linhasDaConversa.length; i++) {
+      if (linhasDaConversa[i].papel === 'user') { primeira = linhasDaConversa[i].texto; break; }
+    }
+    atual.titulo = primeira.replace(/\s+/g, ' ').trim().slice(0, 48) || 'Conversa';
+  }
+  atual.atualizadaEm = Date.now();
+  atual.linhas = linhasDaConversa;
+  atual.contexto = history.map(function (m) {
+    return { role: m.role, content: cortarParaGuardar(m.content) };
+  });
+
+  // A lista fica curta de propósito: assim o painel continua utilizável e a
+  // cota do navegador não estoura. As fixadas nunca entram nessa conta.
+  const soltas = conversas.filter(function (c) { return !c.fixada; });
+  if (soltas.length > LIMITE_CONVERSAS) {
+    soltas.sort(function (a, b) { return (b.atualizadaEm || 0) - (a.atualizadaEm || 0); });
+    const fora = soltas.slice(LIMITE_CONVERSAS);
+    conversas = conversas.filter(function (c) { return fora.indexOf(c) === -1; });
+  }
+
+  salvarConversas();
+  renderizarPainel();
+}
+
+function novaConversa() {
+  pararFala();
+  history.length = 0;
+  linhasDaConversa = [];
+  idAtual = null;
+  document.getElementById('messages').innerHTML = telaInicial;
+  fecharPainel();
+  renderizarPainel();
+}
+
+function abrirConversa(id) {
+  let alvo = null;
+  for (let i = 0; i < conversas.length; i++) {
+    if (conversas[i].id === id) { alvo = conversas[i]; break; }
+  }
+  if (!alvo) return;
+
+  pararFala();
+  idAtual = alvo.id;
+  history.length = 0;
+  (alvo.contexto || []).forEach(function (m) {
+    history.push({ role: m.role, content: m.content });
+  });
+
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  restaurando = true;
+  linhasDaConversa = [];
+  (alvo.linhas || []).forEach(function (l) {
+    linhasDaConversa.push(l);
+    appendMessage(l.papel, l.texto);
+  });
+  restaurando = false;
+
+  fecharPainel();
+  renderizarPainel();
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function acharConversa(id) {
+  for (let i = 0; i < conversas.length; i++) {
+    if (conversas[i].id === id) return conversas[i];
+  }
+  return null;
+}
+
+function fixarConversa(id) {
+  const c = acharConversa(id);
+  if (!c) return;
+  c.fixada = !c.fixada;
+  salvarConversas();
+  renderizarPainel();
+}
+
+function renomearConversa(id) {
+  const c = acharConversa(id);
+  if (!c) return;
+  const novo = prompt('Novo nome da conversa:', c.titulo || '');
+  if (novo === null) return;
+  const limpo = novo.trim().slice(0, 60);
+  if (!limpo) return;
+  c.titulo = limpo;
+  c.renomeada = true;   // o nome escolhido não é sobrescrito pelo automático
+  salvarConversas();
+  renderizarPainel();
+}
+
+function apagarConversa(id) {
+  const c = acharConversa(id);
+  if (!c) return;
+  if (!confirm('Apagar a conversa "' + (c.titulo || '') + '"? Isto não tem volta.')) return;
+  conversas = conversas.filter(function (x) { return x.id !== id; });
+  salvarConversas();
+  if (id === idAtual) novaConversa();
+  else renderizarPainel();
+}
+
+function dataCurta(ms) {
+  if (!ms) return '';
+  const d = new Date(ms);
+  const hoje = new Date();
+  if (d.toDateString() === hoje.toDateString()) {
+    return d.getHours() + 'h' + String(d.getMinutes()).padStart(2, '0');
+  }
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function botaoDoItem(rotulo, dica, acao) {
+  const b = document.createElement('button');
+  b.textContent = rotulo;
+  b.title = dica;
+  b.onclick = acao;
+  return b;
+}
+
+function itemDoPainel(c) {
+  const item = document.createElement('div');
+  item.className = 'conversa' + (c.id === idAtual ? ' atual' : '');
+
+  const abrir = document.createElement('button');
+  abrir.className = 'conversa-abrir';
+  abrir.onclick = function () { abrirConversa(c.id); };
+  const titulo = document.createElement('div');
+  titulo.className = 'conversa-titulo';
+  titulo.textContent = c.titulo || 'Conversa';
+  const data = document.createElement('div');
+  data.className = 'conversa-data';
+  data.textContent = dataCurta(c.atualizadaEm) + ' • ' +
+    ((c.linhas || []).length) + ' mensagens';
+  abrir.appendChild(titulo);
+  abrir.appendChild(data);
+
+  const acoes = document.createElement('div');
+  acoes.className = 'conversa-acoes';
+  acoes.appendChild(botaoDoItem(c.fixada ? '📌' : '📍',
+    c.fixada ? 'Desafixar' : 'Fixar no topo', function () { fixarConversa(c.id); }));
+  acoes.appendChild(botaoDoItem('✏️', 'Renomear', function () { renomearConversa(c.id); }));
+  acoes.appendChild(botaoDoItem('🗑', 'Apagar', function () { apagarConversa(c.id); }));
+
+  item.appendChild(abrir);
+  item.appendChild(acoes);
+  return item;
+}
+
+function secaoDoPainel(nome, lista) {
+  const caixa = document.createElement('div');
+  const titulo = document.createElement('div');
+  titulo.className = 'painel-secao';
+  titulo.textContent = nome;
+  caixa.appendChild(titulo);
+  lista.forEach(function (c) { caixa.appendChild(itemDoPainel(c)); });
+  return caixa;
+}
+
+function renderizarPainel() {
+  const lista = document.getElementById('lista-conversas');
+  if (!lista) return;
+  lista.innerHTML = '';
+
+  const ordenadas = conversas.slice().sort(function (a, b) {
+    return (b.atualizadaEm || 0) - (a.atualizadaEm || 0);
+  });
+  if (!ordenadas.length) {
+    const vazio = document.createElement('div');
+    vazio.className = 'painel-vazio';
+    vazio.textContent = 'Nenhuma conversa guardada ainda. A primeira aparece aqui ' +
+      'assim que você enviar uma mensagem.';
+    lista.appendChild(vazio);
+    return;
+  }
+
+  const fixadas = ordenadas.filter(function (c) { return c.fixada; });
+  const recentes = ordenadas.filter(function (c) { return !c.fixada; });
+  if (fixadas.length) lista.appendChild(secaoDoPainel('Fixadas', fixadas));
+  if (recentes.length) {
+    lista.appendChild(secaoDoPainel(fixadas.length ? 'Recentes' : 'Conversas', recentes));
+  }
+}
+
+function alternarPainel() {
+  const painel = document.getElementById('painel');
+  const fundo = document.getElementById('painel-fundo');
+  const abrindo = !painel.classList.contains('aberto');
+  painel.classList.toggle('aberto', abrindo);
+  fundo.classList.toggle('aberto', abrindo);
+  if (abrindo) renderizarPainel();
+}
+
+function fecharPainel() {
+  document.getElementById('painel').classList.remove('aberto');
+  document.getElementById('painel-fundo').classList.remove('aberto');
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') fecharPainel();
+});
+
+// A tela de boas-vindas é guardada como está no HTML, para "Nova conversa"
+// devolver exatamente ela, com as sugestões.
+telaInicial = document.getElementById('messages').innerHTML;
+carregarConversas();
+renderizarPainel();
 
 // ── Envio resistente a rede instável ──────────────────────────────────────
 // A resposta leva ~8s, e em rede de celular uma queda nesse intervalo derrubava
