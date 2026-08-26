@@ -557,6 +557,30 @@
     .cartao-previa { font-size: 9px; }
   }
 
+  /* ── Imagens geradas e tratadas ─────────────────────────── */
+  .img-msg { margin-top: 10px; }
+  .img-msg img {
+    max-width: 100%; display: block; border-radius: 12px;
+    border: 1px solid var(--border); background: #fff;
+  }
+  .img-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .img-legenda {
+    margin-top: 8px; font-family: 'Space Mono', monospace; font-size: 10px;
+    color: var(--muted); line-height: 1.6;
+  }
+  #desenhar-btn {
+    background: transparent; border: none; padding: 0;
+    width: 32px; height: 32px; font-size: 17px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 8px; flex-shrink: 0;
+    filter: grayscale(1) opacity(0.75); transition: all 0.2s;
+  }
+  #desenhar-btn:hover { background: rgba(108,99,255,0.15); filter: none; }
+  #desenhar-btn.ligado {
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    filter: none;
+  }
+
   /* ── Fontes consultadas na internet ─────────────────────── */
   .fontes-msg { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border);
     font-size: 11px; font-family: 'Space Mono', monospace; }
@@ -736,7 +760,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.17</div>
+  <div class="badge">v2026.18</div>
 </header>
 
 
@@ -791,12 +815,13 @@ Como posso te ajudar hoje?</div>
     <button id="attach-btn" onclick="document.getElementById('file-input').click()" title="Anexar documento ou imagem">
       <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
     </button>
+    <button id="desenhar-btn" onclick="alternarModoDesenho()" title="Gerar uma imagem a partir do texto">🎨</button>
     <textarea id="user-input" placeholder="Digite sua pergunta ou anexe um documento..." rows="1"></textarea>
     <button id="send-btn" onclick="sendMessage()" title="Enviar">
       <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
   </div>
-  <p class="hint">Enter para enviar • Shift+Enter para nova linha • 🎤 fale • 📎 anexe PDF, Word, Excel, imagens</p>
+  <p class="hint">Enter para enviar • 🎤 fale • 📎 anexe PDF, Word, Excel • 🎨 desenhe (ou peça "desenhe um...")</p>
 </div>
 
 <script>
@@ -812,6 +837,8 @@ Características:
 - Usa linguagem natural e acessível
 - Quando não souber algo com certeza, diz claramente
 - Tem acesso a informação atual da internet: notícias, cotações e páginas da web
+- Desenha imagens: se pedirem "desenhe", "gere uma imagem", "crie um logo", a página
+  cuida disso sozinha — nunca diga que você não consegue gerar imagens
 - Mantém respostas concisas (máximo 3-4 parágrafos)
 - Não usa asteriscos para negrito no meio do texto
 
@@ -904,6 +931,21 @@ async function sendMessage() {
     ? (texto ? texto + '\n\n' : '') + '📎 ' + nomes.join(' • ')
     : texto;
   appendMessage('user', visivel);
+
+  // Pedido de desenho segue por outro caminho: gera imagem em vez de texto.
+  const modoImagem = querImagem(texto, !!imagem);
+  if (modoImagem) {
+    anexos.length = 0;
+    renderizarAnexos();
+    desligarModoDesenho();
+    try {
+      await desenharNaConversa(texto, modoImagem === 'transformar' ? imagem.base64 : null);
+    } finally {
+      btn.disabled = false;
+      input.focus();
+    }
+    return;
+  }
 
   // O que a IA recebe
   let conteudo = texto;
@@ -2341,6 +2383,224 @@ function rosto(estado, duracao) {
 // Um agrado: clicar na carinha faz ela sorrir.
 function cutucarRosto() {
   rosto('contente', 900);
+}
+
+// ── Imagens: gerar, transformar e tratar ──────────────────────────────────
+// Gerar e transformar passam pelo Worker (gastam cota). Tratar é feito aqui
+// mesmo, com canvas: instantâneo, funciona sem internet e não gasta nada.
+
+// Gatilho determinístico de propósito. Depender do modelo avisar que quer
+// desenhar repetiria o erro que já tivemos com a busca na internet, quando
+// ele simplesmente não escrevia BUSCAR e a pergunta passava batida.
+const PEDE_DESENHO = new RegExp(
+  // Verbos que só existem para desenhar: bastam sozinhos. As terminações são
+  // fechadas de propósito — assim "analise este desenho" não vira pedido de
+  // desenho, porque o substantivo "desenho" fica de fora.
+  '\\b(desenh(e|a|ar|em)|ilustr(e|ar|em))\\b' +
+  '|' +
+  // Verbos genéricos só valem acompanhados de um substantivo de imagem, senão
+  // "crie uma planilha" e "gere um relatório" cairiam aqui.
+  '\\b(ger[ae]\\w*|cri[ae]\\w*|fa[çc]a|monte|imagine)\\b' +
+  '[^.!?]{0,60}' +
+  '\\b(imagem|imagens|foto|fotos|desenho|ilustra[çc][ãa]o|logo|logotipo|figura|' +
+  'arte|banner|[íi]cone|cartaz|capa|avatar|retrato|paisagem)\\b', 'i');
+
+let modoDesenho = false;
+
+function alternarModoDesenho() {
+  modoDesenho = !modoDesenho;
+  const b = document.getElementById('desenhar-btn');
+  if (b) b.classList.toggle('ligado', modoDesenho);
+  const campo = document.getElementById('user-input');
+  if (campo) {
+    campo.placeholder = modoDesenho
+      ? 'Descreva a imagem que eu devo desenhar...'
+      : 'Digite sua pergunta ou anexe um documento...';
+    campo.focus();
+  }
+}
+
+function desligarModoDesenho() {
+  if (modoDesenho) alternarModoDesenho();
+}
+
+// Devolve 'gerar', 'transformar' ou null (conversa normal).
+function querImagem(texto, temImagem) {
+  if (!modoDesenho && !PEDE_DESENHO.test(texto || '')) return null;
+  return temImagem ? 'transformar' : 'gerar';
+}
+
+async function desenharNaConversa(pedido, origemBase64) {
+  const texto = (pedido || '').trim() ||
+    (origemBase64 ? 'melhore esta imagem' : '');
+  if (!texto) {
+    appendMessage('ai', 'Me diga o que eu devo desenhar. Por exemplo: "desenhe uma ' +
+      'planta de casa térrea vista de cima".');
+    return;
+  }
+
+  rosto('pensando');
+  const typingEl = appendTyping();
+  try {
+    const corpo = { desenhar: texto };
+    if (origemBase64) { corpo.origem = origemBase64; corpo.forca = 0.6; }
+
+    const res = await enviarAoServidor(corpo);
+    let dados = null;
+    try { dados = await res.json(); } catch (e) { /* resposta ilegível */ }
+    typingEl.remove();
+
+    if (!res.ok || !dados || !dados.imagem) {
+      const motivo = (dados && dados.error && dados.error.message) ||
+        ('código ' + res.status);
+      appendMessage('ai', 'Não consegui desenhar. ' + motivo);
+      return;
+    }
+
+    rosto('contente', 1200);
+    mostrarImagem('data:' + (dados.tipo || 'image/jpeg') + ';base64,' + dados.imagem,
+      dados, texto);
+  } catch (e) {
+    typingEl.remove();
+    appendMessage('ai', (e && e.message) ||
+      'Não consegui desenhar. Tente de novo em alguns segundos.');
+  }
+}
+
+function mostrarImagem(dataUrl, dados, pedido) {
+  const msgs = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row ai';
+
+  const av = document.createElement('div');
+  av.className = 'msg-avatar ai';
+  av.innerHTML = SVG_ROSTINHO;
+
+  const bolha = document.createElement('div');
+  bolha.className = 'bubble ai';
+
+  const intro = document.createElement('div');
+  intro.textContent = (dados && dados.recriada)
+    ? 'Redesenhei a imagem com a mudança que você pediu:'
+    : 'Prontinho:';
+  bolha.appendChild(intro);
+
+  const caixa = document.createElement('div');
+  caixa.className = 'img-msg';
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  img.alt = (dados && dados.prompt) || 'imagem gerada';
+  caixa.appendChild(img);
+  caixa.appendChild(criarAcoesDeImagem(img, pedido));
+  bolha.appendChild(caixa);
+
+  if (dados && dados.prompt) {
+    const legenda = document.createElement('div');
+    legenda.className = 'img-legenda';
+    legenda.textContent = '🎨 ' + dados.prompt;
+    bolha.appendChild(legenda);
+  }
+
+  row.appendChild(av);
+  row.appendChild(bolha);
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// Tratamentos locais. Servem principalmente para foto de documento tirada em
+// obra: endireitar, clarear e aumentar contraste deixam o papel legível.
+const FILTROS_IMAGEM = {
+  pb: 'grayscale(1)',
+  clarear: 'brightness(1.25)',
+  escurecer: 'brightness(0.85)',
+  contraste: 'contrast(1.4)',
+};
+
+const ACOES_IMAGEM = [
+  ['↻ girar', 'girar'],
+  ['⬛ P&B', 'pb'],
+  ['☀ clarear', 'clarear'],
+  ['🌙 escurecer', 'escurecer'],
+  ['◐ contraste', 'contraste'],
+  ['📉 reduzir', 'reduzir'],
+];
+
+function criarAcoesDeImagem(img, pedido) {
+  const acoes = document.createElement('div');
+  acoes.className = 'img-acoes';
+
+  const baixar = document.createElement('button');
+  baixar.className = 'btn-baixar destaque';
+  baixar.textContent = '⬇ baixar';
+  baixar.onclick = function () { baixarImagem(img); };
+  acoes.appendChild(baixar);
+
+  ACOES_IMAGEM.forEach(function (par) {
+    const b = document.createElement('button');
+    b.className = 'btn-baixar';
+    b.textContent = par[0];
+    b.onclick = function () { tratarImagem(img, par[1], b); };
+    acoes.appendChild(b);
+  });
+
+  if (pedido) {
+    const outra = document.createElement('button');
+    outra.className = 'btn-baixar';
+    outra.textContent = '🔄 outra versão';
+    outra.onclick = function () { desenharNaConversa(pedido, null); };
+    acoes.appendChild(outra);
+  }
+  return acoes;
+}
+
+// Cada tratamento redesenha a imagem num canvas e substitui o que está na
+// tela, então os efeitos se acumulam e o botão de baixar sempre entrega o
+// que você está vendo.
+function tratarImagem(img, operacao, botao) {
+  if (botao) botao.disabled = true;
+  const base = new Image();
+
+  base.onload = function () {
+    let largura = base.width;
+    let altura = base.height;
+
+    if (operacao === 'reduzir') {
+      const fator = Math.min(1, 1000 / Math.max(largura, altura));
+      largura = Math.max(1, Math.round(largura * fator));
+      altura = Math.max(1, Math.round(altura * fator));
+    }
+
+    const girando = (operacao === 'girar');
+    const canvas = document.createElement('canvas');
+    canvas.width = girando ? altura : largura;
+    canvas.height = girando ? largura : altura;
+
+    const ctx = canvas.getContext('2d');
+    if (FILTROS_IMAGEM[operacao]) ctx.filter = FILTROS_IMAGEM[operacao];
+    if (girando) {
+      ctx.translate(canvas.width, 0);
+      ctx.rotate(Math.PI / 2);
+    }
+    ctx.drawImage(base, 0, 0, largura, altura);
+
+    img.src = canvas.toDataURL('image/jpeg', 0.9);
+    if (botao) botao.disabled = false;
+  };
+
+  base.onerror = function () { if (botao) botao.disabled = false; };
+  base.src = img.src;
+}
+
+function baixarImagem(img) {
+  const partes = img.src.split(',');
+  const tipo = (partes[0].match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+  const binario = atob(partes[1]);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  const extensao = tipo.indexOf('png') !== -1 ? 'png' : 'jpg';
+  const agora = new Date();
+  const carimbo = agora.getHours() + 'h' + String(agora.getMinutes()).padStart(2, '0');
+  baixarBlob(new Blob([bytes], { type: tipo }), 'imagem-' + carimbo + '.' + extensao);
 }
 
 // ── Memória: é isto que faz a IA "aprender" ───────────────────────────────

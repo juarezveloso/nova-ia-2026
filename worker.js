@@ -36,6 +36,22 @@ const MODELO_VISAO = '@cf/meta/llama-3.2-11b-vision-instruct';
 // Reserva sem exigência de licença (usado enquanto a licença não for aceita).
 const MODELO_VISAO_RESERVA = '@cf/llava-hf/llava-1.5-7b-hf';
 
+// ── Imagens ───────────────────────────────────────────────────────────────
+// Desenhar sai barato: o flux-1-schnell custa cerca de 50 neurônios por
+// imagem — menos que uma pergunta com documento anexado. Editar custa mais,
+// porque o img2img roda 20 passos de difusão em vez de 6.
+const MODELO_IMAGEM = '@cf/black-forest-labs/flux-1-schnell';
+
+// Modelos capazes de transformar uma imagem existente (img2img), em ordem de
+// preferência. Medido em 26/08/2026: o sd-1.5-img2img (Beta) vive sem
+// capacidade — erro 3040 em 5 de 5 tentativas —, por isso deixou de ser o
+// primeiro. A cadeia se conserta sozinha se a Cloudflare liberar capacidade.
+const MODELOS_IMAGEM_EDICAO = [
+  '@cf/stabilityai/stable-diffusion-xl-base-1.0',
+  '@cf/lykon/dreamshaper-8-lcm',
+  '@cf/runwayml/stable-diffusion-v1-5-img2img',
+];
+
 // Teto de caracteres enviados ao modelo por requisição (protege o limite de contexto).
 const LIMITE_CARACTERES = 48000;
 
@@ -80,6 +96,12 @@ export default {
 
     const historico = Array.isArray(body.messages) ? body.messages : [];
     const sistema = typeof body.system === 'string' ? body.system : '';
+
+    // ── Caminho 0: pedido de desenho → gera ou edita uma imagem ──────────────
+    // Campo 'desenhar' (e não 'image', que já é a imagem enviada para análise).
+    if (typeof body.desenhar === 'string' && body.desenhar) {
+      return await gerarImagem(env, body);
+    }
 
     // ── Caminho 0: áudio enviado → transcrição (voz para texto) ──────────────
     if (typeof body.audio === 'string' && body.audio) {
@@ -235,6 +257,162 @@ export default {
     }
   },
 };
+
+// O gerador entende inglês muito melhor que português: em português o pedido
+// sai literal e pobre. Traduzir custa cerca de 3 neurônios e muda o resultado.
+async function promptDeImagem(env, pedido) {
+  try {
+    const r = await chamarIA(env, MODELOS.rapido, {
+      messages: [
+        { role: 'system', content: 'Turn the user request (written in Portuguese) into ' +
+          'ONE English prompt for an image generator. Reply with the prompt only: no ' +
+          'quotes, no preamble, no explanation, no line breaks. Add concrete visual ' +
+          'detail — subject, setting, lighting, style. Maximum 60 words.' },
+        { role: 'user', content: pedido },
+      ],
+      max_tokens: 120,
+    });
+    const bruto = (r.resultado.response || '').trim();
+    const primeira = bruto.split('\n').filter(function (l) { return l.trim(); })[0] || '';
+    const limpo = primeira.replace(/^["'`\s]+|["'`\s]+$/g, '').slice(0, 600);
+    return limpo || pedido;
+  } catch (e) {
+    return pedido;   // sem tradução, tenta o pedido original mesmo
+  }
+}
+
+// O flux devolve base64; o img2img devolve um fluxo binário. Uniformizamos os
+// dois no mesmo JSON, senão a página teria de tratar dois formatos diferentes.
+async function fluxoParaBase64(fluxo) {
+  const leitor = fluxo.getReader();
+  const pedacos = [];
+  let total = 0;
+  while (true) {
+    const p = await leitor.read();
+    if (p.done) break;
+    pedacos.push(p.value);
+    total += p.value.length;
+  }
+  const tudo = new Uint8Array(total);
+  let pos = 0;
+  for (let i = 0; i < pedacos.length; i++) { tudo.set(pedacos[i], pos); pos += pedacos[i].length; }
+  // Em blocos: String.fromCharCode(...vetor) estoura a pilha com imagem grande.
+  let texto = '';
+  for (let i = 0; i < tudo.length; i += 8192) {
+    texto += String.fromCharCode.apply(null, tudo.subarray(i, i + 8192));
+  }
+  return btoa(texto);
+}
+
+function base64ParaBytes(base64) {
+  const binario = atob(base64);
+  const bytes = new Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return bytes;
+}
+
+// Descreve uma imagem em inglês, para depois redesenhá-la.
+async function descreverImagem(env, bytes) {
+  const modelos = [MODELO_VISAO, MODELO_VISAO_RESERVA];
+  for (let i = 0; i < modelos.length; i++) {
+    try {
+      const saida = await env.AI.run(modelos[i], {
+        image: bytes,
+        prompt: 'Describe this image in one detailed English sentence: main subject, ' +
+          'colors, composition and style. Reply with the description only.',
+        max_tokens: 200,
+      });
+      const t = (saida.response || saida.description || saida.text || '').trim();
+      if (t) return t;
+    } catch (e) { /* sem esse modelo, tenta o próximo */ }
+  }
+  return '';
+}
+
+// Volta por cima quando os modelos de img2img estão sem capacidade: a visão
+// descreve a imagem e o flux desenha de novo já com a mudança pedida. Não
+// preserva a foto pixel a pixel, mas resolve o caso comum ("deixe em
+// aquarela", "versão futurista") usando só modelos que funcionam.
+async function recriarComVisao(env, origem, pedido) {
+  try {
+    const descricao = await descreverImagem(env, base64ParaBytes(origem));
+    if (!descricao) return null;
+    const prompt = await promptDeImagem(env,
+      'Imagem original: ' + descricao + '\nMudança pedida: ' + pedido +
+      '\nDescreva a imagem final, já com a mudança aplicada.');
+    const r = await chamarIA(env, MODELO_IMAGEM, { prompt: prompt, steps: 6 }, null);
+    if (!r.resultado || !r.resultado.image) return null;
+    return {
+      imagem: r.resultado.image, tipo: 'image/jpeg', prompt: prompt,
+      modelo: MODELO_IMAGEM, recriada: true, descricao: descricao,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+// Gera uma imagem nova, ou transforma a que o usuário anexou (img2img).
+async function gerarImagem(env, body) {
+  const pedido = String(body.desenhar).slice(0, 600).trim();
+  if (!pedido) {
+    return jsonResponse({ error: { message: 'Diga o que eu devo desenhar.' } }, 400);
+  }
+
+  const prompt = await promptDeImagem(env, pedido);
+  const editando = typeof body.origem === 'string' && body.origem.length > 0;
+
+  try {
+    if (editando) {
+      // força: 0 mantém o original, 1 ignora ele. 0,6 muda o visual e ainda
+      // deixa a foto reconhecível, que é o que se espera de "mude o estilo".
+      const forca = Math.min(0.9, Math.max(0.2, Number(body.forca) || 0.6));
+      const entrada = {
+        prompt: prompt,
+        image_b64: body.origem,
+        strength: forca,
+        guidance: 7.5,
+        num_steps: 20,
+      };
+      // Uma tentativa por modelo: a própria cadeia já é a insistência, e
+      // repetir três vezes em cada um levaria a espera para mais de 25s.
+      let ultima = null;
+      for (let i = 0; i < MODELOS_IMAGEM_EDICAO.length; i++) {
+        try {
+          const saida = await env.AI.run(MODELOS_IMAGEM_EDICAO[i], entrada);
+          return jsonResponse({
+            imagem: await fluxoParaBase64(saida),
+            tipo: 'image/png',
+            prompt: prompt,
+            modelo: MODELOS_IMAGEM_EDICAO[i],
+          }, 200);
+        } catch (e) {
+          ultima = e;   // sem capacidade ou indisponível: tenta o próximo
+        }
+      }
+
+      // Nenhum modelo de edição atendeu: redesenha a partir da descrição.
+      const recriada = await recriarComVisao(env, body.origem, pedido);
+      if (recriada) return jsonResponse(recriada, 200);
+      throw ultima;
+    }
+
+    // 6 passos em vez dos 4 padrão: melhora visivelmente o traço e ainda
+    // deixa a imagem por volta de 60 neurônios.
+    const r = await chamarIA(env, MODELO_IMAGEM, { prompt: prompt, steps: 6 }, null);
+    const base64 = r.resultado && r.resultado.image;
+    if (!base64) {
+      return jsonResponse({ error: { message: 'O gerador não devolveu imagem.' } }, 502);
+    }
+    return jsonResponse({
+      imagem: base64, tipo: 'image/jpeg', prompt: prompt, modelo: MODELO_IMAGEM,
+    }, 200);
+  } catch (e) {
+    const erro = { message: descreverErro(e) };
+    // O texto cru do erro so sai a pedido: ajuda a diagnosticar sem poluir a tela.
+    if (body.debug) erro.bruto = e && e.message ? e.message : String(e);
+    return jsonResponse({ error: erro }, 502);
+  }
+}
 
 // Analisa uma imagem (ou página escaneada) com o modelo de visão.
 async function analisarImagem(env, body, sistema) {
