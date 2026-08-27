@@ -493,3 +493,71 @@ No lugar do pontinho piscando, a Bebi diz o que esta fazendo: *olhando a
 imagem*, *lendo o documento*, *consultando dados atuais*, *desenhando*. Ela so
 anuncia o que realmente vai acontecer - o aviso de consulta a internet usa o
 mesmo gatilho que o Worker usa para decidir buscar.
+
+## Planta 2D vira maquete 3D
+
+Anexe a foto ou o PDF de uma planta baixa e peca "em 3D" (ou "maquete",
+"volumetria"). A Bebi le os comodos e abre uma maquete que voce gira com o dedo.
+
+**O que isto e, com todas as letras:** um ESTUDO DE VOLUMES, nao uma conversao
+de CAD. As paredes tem espessura fixa de 15 cm, nao ha portas nem janelas, e a
+planta e remontada por fileiras. Serve para enxergar a proporcao dos ambientes e
+conferir areas -- nao substitui um projeto.
+
+### Como funciona, e por que assim
+
+Medido em 27/08/2026 com uma planta de medidas conhecidas:
+
+- O modelo de visao le os **nomes** e as **medidas** escritas dentro dos comodos
+  com precisao total: 5 de 5 comodos, todas as medidas exatas, em 3 rodadas
+  identicas.
+- O que ele **nao sabe fazer** e calcular posicao absoluta. Pedindo X e Y em
+  metros, ele devolveu a propria largura do comodo no lugar do X.
+- O que ele **acerta** e a ordem: em que fileira o comodo esta e a sequencia da
+  esquerda para a direita. A planta e remontada dai, acumulando larguras dentro
+  da fileira e profundidades entre fileiras.
+
+O texto do pedido decidiu o resultado. Sem a instrucao em portugues e sem um
+exemplo concreto de resposta, o modelo devolvia lista numerada em prosa e chegou
+a inventar um titulo ("Santa Baixa") -- na MESMA imagem que ele le com precisao
+quando o formato esta ancorado por exemplo.
+
+### Na tela
+
+| Controle | O que faz |
+|---|---|
+| arrastar | gira em volta da casa |
+| rolar / pinca | aproxima e afasta |
+| pe-direito | altura das paredes, de 2 a 6 m |
+| de cima | vista de planta |
+| nomes | liga e desliga as etiquetas |
+| salvar imagem | PNG da vista atual |
+| Excel dos comodos | planilha com area de cada um e o total |
+
+A **tabela embaixo da maquete e editavel**: corrija nome, fileira ou medida e a
+maquete se refaz na hora. Isso importa porque o unico erro recorrente do modelo
+e colocar um comodo na fileira errada -- quando isso acontece, um aviso amarelo
+aparece dizendo que as fileiras sairam desiguais.
+
+### Detalhes tecnicos
+
+O 3D e escrito a mao em canvas, **sem biblioteca**: projecao em perspectiva,
+descarte de faces de costas e ordenacao pelo algoritmo do pintor. Paredes
+compartilhadas entre dois comodos sao unidas por chave, para nao desenhar a
+mesma superficie duas vezes -- numa planta de 5 comodos isso reduz de 20 para 17
+paredes. Como nao depende de CDN, **funciona offline** como o resto do app.
+
+A maquete abre a **60 graus acima do chao**, e nao a 36 como no primeiro ajuste.
+O motivo foi medido sondando o pixel do piso de cada comodo: a 36 graus, so 2
+dos 5 pisos apareciam, porque a parede da frente escondia os do fundo. E
+fisicamente correto -- o renderizador estava certo --, mas inutil para conferir a
+planta. Girar para baixo continua liberado para quem quiser a vista rasante.
+
+### Quando nao funciona bem
+
+- Planta **sem medidas escritas** dentro dos comodos: o modelo nao tem de onde
+  tirar os numeros.
+- Planta em **L, U ou com recuos**: a remontagem por fileiras aproxima, e o
+  resultado sai mais retangular que o original.
+- Foto **torta ou escura**: use os botoes de tratamento de imagem (girar,
+  contraste, P&B) antes de pedir o 3D.
