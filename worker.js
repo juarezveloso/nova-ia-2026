@@ -420,84 +420,129 @@ async function gerarImagem(env, body) {
 }
 
 // ── Planta baixa → 3D ─────────────────────────────────────────────────────
-// Medido em 27/08/2026 com uma planta de verdade conhecida: o modelo de visão
-// lê os NOMES e as MEDIDAS escritas dentro dos cômodos com precisão total
-// (5 de 5 cômodos, todas as medidas exatas). O que ele NÃO sabe fazer é
-// calcular a posição absoluta: pedindo X e Y em metros, ele devolveu a própria
-// largura do cômodo no lugar do X. O que ele acerta é a ORDEM — em que fileira
-// cada cômodo está e a sequência da esquerda para a direita. Com isso mais as
-// medidas reais, a planta é remontada por acumulação de larguras.
-// O texto do pedido decide o resultado. Sem a primeira linha e sem o exemplo, o
-// modelo devolvia lista numerada em prosa ("1. Nome: 2. Fileira:") e chegou a
-// inventar um título — a mesma imagem que ele lê com precisão total quando o
-// formato está ancorado por um exemplo concreto.
+// Divisão de trabalho aprendida na marra (27/08/2026): o modelo de visão só
+// TRANSCREVE, e o código interpreta. Pedindo NOME;FILEIRA;LARGURA;PROFUNDIDADE;
+// AREA numa planta real, ele misturou tudo — pôs área no campo de largura,
+// leu medida de porta como cômodo ("VÃO 0,70 x 2,10") e devolveu VARANDA como
+// 30,75 x 30,75 (946 m²). Pedindo só o texto que está escrito embaixo do nome,
+// copiado como está, ele acerta: transcrever é o que ele faz bem.
+//
+// Na planta brasileira típica esse texto é a ÁREA em m². Quando só há área, o
+// cômodo vira um quadrado de mesma área — a metragem fica exata e a proporção o
+// usuário corrige na tabela.
 const PERGUNTA_PLANTA =
   'Responda sempre em português brasileiro.\n\n' +
-  'Esta é uma planta baixa de arquitetura. Liste os cômodos, um por linha, neste formato:\n' +
-  'NOME;FILEIRA;LARGURA;PROFUNDIDADE\n\n' +
+  'Esta é uma planta baixa de arquitetura. Liste os cômodos, um por linha:\n' +
+  'NOME;FILEIRA;MEDIDA\n\n' +
+  'MEDIDA é o texto escrito logo abaixo do nome do cômodo, copiado EXATAMENTE ' +
+  'como aparece na planta. Costuma ser uma área ("8.06 m2"), mas pode ser um par ' +
+  'de dimensões ("5,00 x 4,00"). Copie, não calcule.\n\n' +
   'Exemplo de resposta correta:\n' +
-  'SALA;1;5.00;4.00\n' +
-  'COZINHA;1;3.00;4.00\n' +
-  'QUARTO;2;3.50;3.50\n\n' +
+  'COZINHA;1;8.06 m2\n' +
+  'HALL DE ENTRADA;1;3.36 m2\n' +
+  'SUITE;2;14.35 m2\n\n' +
   'FILEIRA é 1 para a faixa de cômodos mais de cima, 2 para a faixa seguinte, ' +
   'contando de cima para baixo. Dentro de cada fileira, liste da ESQUERDA para a ' +
-  'DIREITA. LARGURA e PROFUNDIDADE são os números em metros escritos dentro do ' +
-  'cômodo, largura primeiro. Não invente cômodos nem medidas.\n' +
+  'DIREITA.\n' +
+  'Liste cada cômodo UMA única vez. Não liste "ÁREA TOTAL". Ignore as medidas de ' +
+  'portas e janelas escritas em vermelho sobre as paredes.\n' +
   'Responda apenas com as linhas. Sem título, sem numeração, sem comentário.';
 
-// Aceita ; ou | como separador e não depende da ordem dos campos: o modelo
-// troca a ordem com frequência, mas os tipos são inconfundíveis — a fileira é
-// um inteiro pequeno, as medidas têm decimal, e o nome não é número.
+// Cômodos que não são cômodo: somatórios e áreas externas que deformariam a
+// maquete se entrassem na planta.
+const NAO_E_COMODO = /[áa]rea\s+total|total\s+constru|^v[ãa]o$|^porta$|^janela$/i;
+
+// Em planta densa o modelo às vezes trava e repete a mesma linha dezenas de
+// vezes — cheguei a receber "DEPÓSITO" 35 vezes seguidas, somando 721 m². Duas
+// travas: linha igual à anterior é descartada, e a lista tem teto.
+const MAX_COMODOS = 30;
+
+function numeroPt(t) {
+  const n = Number(String(t).replace(/\./g, m => m).replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+// Lê o campo de medida transcrito. Duas formas possíveis, nesta ordem:
+//   "5,00 x 4,00"  → largura e profundidade
+//   "14.35 m2"     → área, e o retângulo vira um quadrado de mesma área
+function interpretarMedida(texto) {
+  const t = String(texto).replace(/×/g, 'x');
+
+  const par = t.match(/(\d+[.,]?\d*)\s*x\s*(\d+[.,]?\d*)/i);
+  if (par) {
+    const l = numeroPt(par[1]), p = numeroPt(par[2]);
+    if (l > 0 && p > 0) return { largura: l, profundidade: p, area: l * p, derivado: false };
+  }
+
+  const um = t.match(/(\d+[.,]?\d*)/);
+  if (um) {
+    const a = numeroPt(um[1]);
+    if (a > 0) {
+      const lado = Math.sqrt(a);
+      return { largura: lado, profundidade: lado, area: a, derivado: true };
+    }
+  }
+  return null;
+}
+
+// Aceita ; ou | como separador. O nome é a parte que não é número; a fileira é
+// um inteiro pequeno sozinho; o resto é a medida transcrita.
 function lerLinhaDeComodo(linha) {
   const partes = linha.split(/[;|\t]/).map(function (p) { return p.trim(); })
     .filter(function (p) { return p.length; });
-  if (partes.length < 3) return null;
+  if (partes.length < 2) return null;
 
   let nome = '';
   let fileira = 0;
-  const medidas = [];
+  let medida = '';
 
   partes.forEach(function (p) {
-    // Tira a unidade escrita junto ("5,00 m") antes de decidir se é número.
-    // Sem isso, a medida com unidade caía como texto e o cômodo se perdia.
-    // As mais longas vêm primeiro: a alternância casa a primeira que servir, e
-    // "m" sozinho engoliria o "m" de "mm". O nome do cômodo não corre risco —
-    // se sobrar texto, ele cai no ramo do nome, que usa a parte original.
-    const semUnidade = p.replace(/\s*(metros?|mts?|m²|m2|mm|cm|m)\s*$/i, '').trim();
-    const numero = semUnidade.replace(',', '.');
-    const ehNumero = /^[0-9]+(\.[0-9]+)?$/.test(numero);
-    if (!ehNumero) {
-      if (!nome) nome = p;
-      return;
-    }
-    const valor = Number(numero);
-    // Inteiro de 1 a 9 sem decimal é a fileira; o resto é medida.
-    if (!fileira && numero.indexOf('.') === -1 &&
-        valor >= 1 && valor <= 9) {
-      fileira = valor;
-      return;
-    }
-    medidas.push(valor);
+    if (!fileira && /^[1-9]$/.test(p)) { fileira = Number(p); return; }
+    if (!nome && !/\d/.test(p)) { nome = p; return; }
+    if (!nome && /^[^0-9]+/.test(p) && !/\d+\s*[xm]/i.test(p)) { nome = p; return; }
+    if (!medida && /\d/.test(p)) { medida = p; return; }
+    if (!nome) nome = p;
   });
 
-  if (!nome) return null;
+  if (!nome || !medida) return null;
+  const m = interpretarMedida(medida);
+  if (!m) return null;
+
   return {
     nome: nome.slice(0, 40),
     fileira: fileira || 1,
-    largura: medidas[0] || 0,
-    profundidade: medidas[1] || 0,
+    largura: Math.round(m.largura * 100) / 100,
+    profundidade: Math.round(m.profundidade * 100) / 100,
+    area: Math.round(m.area * 100) / 100,
+    derivado: m.derivado,
   };
 }
 
 function lerComodos(texto) {
   const comodos = [];
+  const jaVistos = {};
   String(texto).split('\n').forEach(function (linha) {
     const limpa = linha.trim();
-    if (!limpa || limpa.indexOf(';') === -1 && limpa.indexOf('|') === -1) return;
-    // Descarta um eventual cabeçalho que o modelo insista em escrever.
-    if (/nome\s*[;|]\s*fileira/i.test(limpa)) return;
+    if (!limpa) return;
+    if (limpa.indexOf(';') === -1 && limpa.indexOf('|') === -1) return;
+    if (/nome\s*[;|]\s*fileira/i.test(limpa)) return;   // cabeçalho
+
     const c = lerLinhaDeComodo(limpa);
-    if (c && c.largura > 0 && c.profundidade > 0) comodos.push(c);
+    if (!c || c.largura <= 0 || c.profundidade <= 0) return;
+    if (NAO_E_COMODO.test(c.nome.trim())) return;
+    // Fora da faixa plausível para um cômodo de casa: abaixo de 1,2 m² costuma
+    // ser cota de porta lida por engano; acima de 60 m², leitura errada de área.
+    if (c.area < 1.2 || c.area > 60) return;
+
+    // Repetição em CICLO: o modelo devolveu ESTAR, JANTAR, CIRCULAÇÃO e voltou
+    // ao ESTAR três vezes seguidas. Comparar só com a linha anterior não pega
+    // isso — a chave nome+área tem de valer para a lista inteira. Dois cômodos
+    // de mesmo nome sobrevivem se as áreas diferirem (os dois BWC, 4,65 e 4,80).
+    const assinatura = c.nome.toLowerCase().replace(/s+/g, ' ') + '|' + c.area;
+    if (jaVistos[assinatura]) return;
+    jaVistos[assinatura] = true;
+    if (comodos.length >= MAX_COMODOS) return;
+    comodos.push(c);
   });
   return comodos;
 }

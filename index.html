@@ -1003,7 +1003,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.25</div>
+  <div class="badge">v2026.26</div>
 </header>
 
 
@@ -1184,11 +1184,15 @@ async function sendMessage() {
 
   // Planta anexada + pedido de 3D vem ANTES do desenho: "gere uma imagem 3D da
   // planta" casa com os dois testes, e quem manda aqui é a planta.
-  if (imagem && PEDE_3D.test(texto)) {
+  // Vale para imagem OU para PDF: planta de arquitetura quase sempre vem em
+  // PDF vetorial, que o leitor trata como texto e nunca chegaria aqui.
+  const anexoDaPlanta = imagem || prontos.filter(function (a) { return a.base64; })[0];
+  if (anexoDaPlanta && PEDE_3D.test(texto)) {
+    const originalDaPlanta = anexoDaPlanta.arquivo;
     anexos.length = 0;
     renderizarAnexos();
     try {
-      await plantaEmTresDimensoes(imagem.base64);
+      await plantaEmTresDimensoes(anexoDaPlanta.base64, originalDaPlanta);
     } finally {
       btn.disabled = false;
       input.focus();
@@ -1521,13 +1525,23 @@ async function lerPdf(file) {
       aviso: 'PDF escaneado — analisando a 1ª página como imagem',
     };
   }
-  return { tipo: 'texto', texto: texto };
+
+  // Mesmo com camada de texto, guardamos a 1ª página desenhada: uma planta de
+  // arquitetura em PDF vetorial é texto para o leitor, mas para virar maquete
+  // 3D ela precisa ser vista como desenho.
+  let pagina1 = null;
+  try { pagina1 = await renderizarPaginaPdf(pdf, 1); } catch (e) { /* segue sem */ }
+  return { tipo: 'texto', texto: texto, base64: pagina1 };
 }
 
-async function renderizarPaginaPdf(pdf, numero) {
+// ladoMaior controla a resolução: 1400 basta para ler texto de documento
+// escaneado, mas planta de arquitetura tem letra miúda no meio de cotas e
+// hachuras — aí vale render maior, mesmo custando alguns segundos.
+async function renderizarPaginaPdf(pdf, numero, ladoMaior) {
   const pagina = await pdf.getPage(numero);
   const base = pagina.getViewport({ scale: 1 });
-  const escala = Math.min(2, 1400 / Math.max(base.width, base.height));
+  const alvo = ladoMaior || 1400;
+  const escala = Math.min(4, alvo / Math.max(base.width, base.height));
   const viewport = pagina.getViewport({ scale: escala });
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(viewport.width);
@@ -1614,7 +1628,9 @@ async function reduzirImagem(file, maxLado) {
 async function adicionarArquivos(lista) {
   const arquivos = Array.from(lista);
   for (const file of arquivos) {
-    const item = { nome: file.name, tamanho: file.size, status: 'lendo' };
+    // Guarda o arquivo em si: a maquete 3D precisa redesenhar o PDF em
+    // resolução maior que a usada para leitura de texto.
+    const item = { nome: file.name, tamanho: file.size, status: 'lendo', arquivo: file };
     anexos.push(item);
     renderizarAnexos();
 
@@ -1629,6 +1645,7 @@ async function adicionarArquivos(lista) {
       const r = await extrairConteudo(file);
       item.tipo = r.tipo;
       item.aviso = r.aviso;
+      if (r.base64) item.base64 = r.base64;
       if (r.tipo === 'texto') {
         const t = r.texto.replace(/\n{4,}/g, '\n\n\n').trim();
         item.cortado = t.length > LIMITE_TEXTO;
@@ -3587,15 +3604,27 @@ function baixarPlanilhaDeComodos() {
 // Pedido de 3D só vale com imagem anexada: sem a planta não há o que ler.
 const PEDE_3D = /\b(3d|3-?d|tr[êe]s dimens\w*|maquete|volumetria|perspectiva)\b/i;
 
-async function plantaEmTresDimensoes(base64) {
+async function plantaEmTresDimensoes(base64, arquivoOriginal) {
   if (!navigator.onLine) { avisarSemInternet(); return; }
 
   rosto("pensando");
   const typingEl = appendTyping();
-  passo(typingEl, "📐 lendo os cômodos da planta…");
 
   try {
-    const res = await enviarAoServidor({ planta: base64 });
+    // Planta em PDF é redesenhada maior só para esta leitura: nomes e áreas
+    // dos cômodos são escritos em corpo pequeno no meio das cotas.
+    let imagem = base64;
+    if (arquivoOriginal && /\.pdf$/i.test(arquivoOriginal.name || "")) {
+      passo(typingEl, "🔍 ampliando a planta…");
+      try {
+        await carregarBiblioteca("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+        const doc = await pdfjsLib.getDocument({ data: await arquivoOriginal.arrayBuffer() }).promise;
+        imagem = await renderizarPaginaPdf(doc, 1, 2400);
+      } catch (e) { /* sem a ampliação, usa a imagem normal */ }
+    }
+    passo(typingEl, "📐 lendo os cômodos da planta…");
+
+    const res = await enviarAoServidor({ planta: imagem });
     let dados = null;
     try { dados = await res.json(); } catch (e) { /* resposta ilegível */ }
     typingEl.remove();
