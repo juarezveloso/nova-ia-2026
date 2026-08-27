@@ -563,6 +563,67 @@
     .cartao-previa { font-size: 9px; }
   }
 
+  /* ── Maquete 3D da planta ───────────────────────────────── */
+  #maquete-fundo {
+    position: fixed; inset: 0; z-index: 120; display: none;
+    background: rgba(0,0,0,0.72);
+  }
+  #maquete-fundo.aberto { display: flex; align-items: center; justify-content: center; }
+  #maquete {
+    width: min(940px, 96vw); max-height: 94vh; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px;
+  }
+  .maquete-topo {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 12px;
+  }
+  .maquete-titulo { font-weight: 700; font-size: 15px; }
+  .maquete-x {
+    background: transparent; border: none; color: var(--muted);
+    font-size: 24px; line-height: 1; cursor: pointer; padding: 0 4px;
+  }
+  .maquete-x:hover { color: var(--text); }
+  #tela3d {
+    display: block; width: 100%; border-radius: 10px;
+    background: linear-gradient(#1a1d29, #0d0f16);
+    border: 1px solid var(--border); touch-action: none; cursor: grab;
+  }
+  #tela3d:active { cursor: grabbing; }
+  .maquete-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .maquete-controle {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);
+  }
+  .maquete-controle input[type=range] { flex: 1; accent-color: var(--accent); }
+  .maquete-dica {
+    margin-top: 8px; font-family: 'Space Mono', monospace;
+    font-size: 10px; color: var(--muted); line-height: 1.6;
+  }
+  #comodos-tabela { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  #comodos-tabela th {
+    text-align: left; font-family: 'Space Mono', monospace; font-size: 10px;
+    color: var(--muted); text-transform: uppercase; padding: 4px 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  #comodos-tabela td { padding: 3px 4px; border-bottom: 1px solid var(--border); }
+  #comodos-tabela input {
+    width: 100%; background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 7px; font-family: inherit; font-size: 12px;
+  }
+  #comodos-tabela input:focus { outline: none; border-color: var(--accent); }
+  #comodos-tabela input.num { font-family: 'Space Mono', monospace; text-align: right; }
+  #comodos-tabela .apagar {
+    background: transparent; border: none; color: var(--muted);
+    cursor: pointer; font-size: 14px; padding: 2px 4px;
+  }
+  .maquete-aviso {
+    margin-top: 10px; padding: 9px 12px; border-radius: 8px;
+    background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.4);
+    font-size: 12px; color: #f5c46b; line-height: 1.55;
+  }
+
   /* ── Sinal de que está sem internet ─────────────────────── */
   .status-dot.offline { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; animation: none; }
 
@@ -868,6 +929,37 @@
 </head>
 <body>
 
+<div id="maquete-fundo" onclick="if(event.target===this)fecharMaquete()">
+  <div id="maquete">
+    <div class="maquete-topo">
+      <span class="maquete-titulo">Maquete 3D da planta</span>
+      <button class="maquete-x" onclick="fecharMaquete()" title="Fechar">&times;</button>
+    </div>
+    <canvas id="tela3d" width="880" height="500"></canvas>
+    <div class="maquete-controle">
+      <span>pé-direito</span>
+      <input type="range" id="pe-direito" min="2" max="6" step="0.1" value="2.8"
+        oninput="ajustarPeDireito(this.value)">
+      <span id="pe-direito-valor">2,8 m</span>
+    </div>
+    <div class="maquete-acoes">
+      <button class="btn-baixar destaque" onclick="baixarMaquete()">⬇ salvar imagem</button>
+      <button class="btn-baixar" onclick="girarMaquete(-0.6)">↺ girar</button>
+      <button class="btn-baixar" onclick="girarMaquete(0.6)">↻ girar</button>
+      <button class="btn-baixar" onclick="vistaDeCima()">⬒ de cima</button>
+      <button class="btn-baixar" onclick="vistaPadrao()">⌂ vista inicial</button>
+      <button class="btn-baixar" onclick="alternarNomes()">🏷 nomes</button>
+    </div>
+    <div id="maquete-alerta"></div>
+    <table id="comodos-tabela"><tbody id="comodos-corpo"></tbody></table>
+    <div class="maquete-acoes">
+      <button class="btn-baixar" onclick="acrescentarComodo()">+ cômodo</button>
+      <button class="btn-baixar" onclick="baixarPlanilhaDeComodos()">⬇ Excel dos cômodos</button>
+    </div>
+    <p class="maquete-dica">Arraste para girar · role para aproximar · corrija qualquer medida na tabela e a maquete se refaz.</p>
+  </div>
+</div>
+
 <div id="painel-fundo" onclick="fecharPainel()"></div>
 <aside id="painel">
   <div class="painel-topo">
@@ -911,7 +1003,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.23</div>
+  <div class="badge">v2026.24</div>
 </header>
 
 
@@ -972,7 +1064,7 @@ Como posso te ajudar hoje?</div>
       <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
   </div>
-  <p class="hint">Enter para enviar • 🎤 fale • 📎 anexe PDF, Word, Excel • 🎨 desenhe • 📴 abre sem internet</p>
+  <p class="hint">Enter para enviar • 🎤 fale • 📎 anexe • 🎨 desenhe • 🏠 anexe uma planta e peça "em 3D"</p>
 </div>
 
 <script>
@@ -1089,6 +1181,20 @@ async function sendMessage() {
     ? (texto ? texto + '\n\n' : '') + '📎 ' + nomes.join(' • ')
     : texto;
   appendMessage('user', visivel);
+
+  // Planta anexada + pedido de 3D vem ANTES do desenho: "gere uma imagem 3D da
+  // planta" casa com os dois testes, e quem manda aqui é a planta.
+  if (imagem && PEDE_3D.test(texto)) {
+    anexos.length = 0;
+    renderizarAnexos();
+    try {
+      await plantaEmTresDimensoes(imagem.base64);
+    } finally {
+      btn.disabled = false;
+      input.focus();
+    }
+    return;
+  }
 
   // Pedido de desenho segue por outro caminho: gera imagem em vez de texto.
   const modoImagem = querImagem(texto, !!imagem);
@@ -3027,6 +3133,496 @@ function promptComMemoria() {
 }
 
 carregarMemoria();
+
+// ── Planta 2D para maquete 3D ─────────────────────────────────────────────
+// O modelo de visão lê os nomes e as medidas escritas na planta com precisão,
+// mas não sabe calcular a posição absoluta de cada cômodo — pedindo X e Y em
+// metros, ele devolveu a própria largura no lugar do X. O que ele acerta é a
+// ORDEM: em que fileira o cômodo está e a sequência da esquerda para a direita.
+// A planta é remontada daí, acumulando larguras dentro da fileira e
+// profundidades entre fileiras.
+//
+// Isto é um estudo de volumes, não uma conversão de CAD: as paredes ficam com
+// espessura fixa e não há portas nem janelas. Serve para enxergar a proporção
+// dos ambientes, e a tabela embaixo permite corrigir qualquer medida.
+const ESPESSURA_PAREDE = 0.15;   // metros
+const CORES_COMODO = ["#6c63ff", "#22b8a6", "#f59e0b", "#ec4899", "#3b82f6",
+  "#84cc16", "#a855f7", "#ef4444", "#14b8a6", "#f97316"];
+
+let comodosDaPlanta = [];
+let peDireito = 2.8;
+let mostrarNomes = true;
+const camera3d = { az: -0.9, el: 0.62, dist: 26 };
+
+// ── Vetores ───────────────────────────────────────────────────────────────
+function sub3(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function ponto3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function cruz3(a, b) {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+function normalizar3(a) {
+  const t = Math.sqrt(ponto3(a, a)) || 1;
+  return [a[0] / t, a[1] / t, a[2] / t];
+}
+
+// ── Remontagem da planta ──────────────────────────────────────────────────
+function montarRetangulos(comodos) {
+  const fileiras = {};
+  comodos.forEach(function (c) {
+    const f = c.fileira || 1;
+    if (!fileiras[f]) fileiras[f] = [];
+    fileiras[f].push(c);
+  });
+
+  const numeros = Object.keys(fileiras).map(Number).sort(function (a, b) { return a - b; });
+  const retangulos = [];
+  let y = 0;
+  numeros.forEach(function (f) {
+    let x = 0;
+    let maisFunda = 0;
+    fileiras[f].forEach(function (c) {
+      retangulos.push({
+        nome: c.nome, x: x, y: y,
+        largura: c.largura, profundidade: c.profundidade,
+        cor: CORES_COMODO[retangulos.length % CORES_COMODO.length],
+      });
+      x += c.largura;
+      if (c.profundidade > maisFunda) maisFunda = c.profundidade;
+    });
+    y += maisFunda;
+  });
+  return retangulos;
+}
+
+// Cada aresta de cômodo vira uma parede. Paredes compartilhadas entre dois
+// cômodos aparecem duas vezes na lista — juntamos pela chave para não desenhar
+// a mesma superfície duas vezes e evitar o tremor entre faces coincidentes.
+function montarParedes(retangulos) {
+  const vistas = {};
+  const paredes = [];
+  const t = ESPESSURA_PAREDE / 2;
+
+  retangulos.forEach(function (r) {
+    const x1 = r.x, x2 = r.x + r.largura;
+    const y1 = r.y, y2 = r.y + r.profundidade;
+    const arestas = [
+      [x1, y1, x2, y1], [x1, y2, x2, y2],   // horizontais
+      [x1, y1, x1, y2], [x2, y1, x2, y2],   // verticais
+    ];
+    arestas.forEach(function (a) {
+      const chave = a.map(function (v) { return v.toFixed(2); }).join(",");
+      if (vistas[chave]) return;
+      vistas[chave] = true;
+      const horizontal = Math.abs(a[1] - a[3]) < 0.001;
+      paredes.push(horizontal
+        ? { min: [a[0] - t, a[1] - t, 0], max: [a[2] + t, a[1] + t, peDireito] }
+        : { min: [a[0] - t, a[1] - t, 0], max: [a[0] + t, a[3] + t, peDireito] });
+    });
+  });
+  return paredes;
+}
+
+// ── Câmera e projeção ─────────────────────────────────────────────────────
+function montarCamera(centro) {
+  const ce = Math.cos(camera3d.el), se = Math.sin(camera3d.el);
+  const olho = [
+    centro[0] + camera3d.dist * ce * Math.cos(camera3d.az),
+    centro[1] + camera3d.dist * ce * Math.sin(camera3d.az),
+    centro[2] + camera3d.dist * se,
+  ];
+  const frente = normalizar3(sub3(centro, olho));
+  const direita = normalizar3(cruz3(frente, [0, 0, 1]));
+  const cima = cruz3(direita, frente);
+  return { olho: olho, frente: frente, direita: direita, cima: cima };
+}
+
+function projetar(p, cam, larg, alt, foco) {
+  const v = sub3(p, cam.olho);
+  const z = ponto3(v, cam.frente);
+  if (z <= 0.05) return null;         // atrás da câmera
+  return [
+    larg / 2 + foco * ponto3(v, cam.direita) / z,
+    alt / 2 - foco * ponto3(v, cam.cima) / z,
+    z,
+  ];
+}
+
+// As seis faces de uma caixa, com a normal apontando para fora.
+function facesDaCaixa(caixa, cor) {
+  const a = caixa.min, b = caixa.max;
+  return [
+    { n: [0, 0, 1],  v: [[a[0],a[1],b[2]], [b[0],a[1],b[2]], [b[0],b[1],b[2]], [a[0],b[1],b[2]]], cor: cor },
+    { n: [0, 0, -1], v: [[a[0],a[1],a[2]], [a[0],b[1],a[2]], [b[0],b[1],a[2]], [b[0],a[1],a[2]]], cor: cor },
+    { n: [-1, 0, 0], v: [[a[0],a[1],a[2]], [a[0],a[1],b[2]], [a[0],b[1],b[2]], [a[0],b[1],a[2]]], cor: cor },
+    { n: [1, 0, 0],  v: [[b[0],a[1],a[2]], [b[0],b[1],a[2]], [b[0],b[1],b[2]], [b[0],a[1],b[2]]], cor: cor },
+    { n: [0, -1, 0], v: [[a[0],a[1],a[2]], [b[0],a[1],a[2]], [b[0],a[1],b[2]], [a[0],a[1],b[2]]], cor: cor },
+    { n: [0, 1, 0],  v: [[a[0],b[1],a[2]], [a[0],b[1],b[2]], [b[0],b[1],b[2]], [b[0],b[1],a[2]]], cor: cor },
+  ];
+}
+
+function clarear(cor, fator) {
+  const n = parseInt(cor.slice(1), 16);
+  const r = Math.min(255, Math.round(((n >> 16) & 255) * fator));
+  const g = Math.min(255, Math.round(((n >> 8) & 255) * fator));
+  const b = Math.min(255, Math.round((n & 255) * fator));
+  return "rgb(" + r + "," + g + "," + b + ")";
+}
+
+// ── Desenho ───────────────────────────────────────────────────────────────
+function desenhar3d() {
+  const tela = document.getElementById("tela3d");
+  if (!tela) return;
+  const ctx = tela.getContext("2d");
+  const larg = tela.width, alt = tela.height;
+
+  const gradiente = ctx.createLinearGradient(0, 0, 0, alt);
+  gradiente.addColorStop(0, "#1a1d29");
+  gradiente.addColorStop(1, "#0d0f16");
+  ctx.fillStyle = gradiente;
+  ctx.fillRect(0, 0, larg, alt);
+
+  const retangulos = montarRetangulos(comodosDaPlanta);
+  if (!retangulos.length) return;
+
+  let maxX = 0, maxY = 0;
+  retangulos.forEach(function (r) {
+    if (r.x + r.largura > maxX) maxX = r.x + r.largura;
+    if (r.y + r.profundidade > maxY) maxY = r.y + r.profundidade;
+  });
+  const centro = [maxX / 2, maxY / 2, peDireito / 2];
+
+  // A distância acompanha o tamanho da casa, senão plantas grandes saem fora.
+  const raio = Math.sqrt(maxX * maxX + maxY * maxY) || 10;
+  const cam = montarCamera(centro);
+  const foco = larg * 0.9;
+
+  const luz = normalizar3([0.4, -0.7, 0.9]);
+  const faces = [];
+
+  // Piso de cada cômodo, na cota zero
+  retangulos.forEach(function (r) {
+    faces.push({
+      n: [0, 0, 1],
+      v: [[r.x, r.y, 0], [r.x + r.largura, r.y, 0],
+          [r.x + r.largura, r.y + r.profundidade, 0], [r.x, r.y + r.profundidade, 0]],
+      cor: r.cor, piso: true, rotulo: r,
+    });
+  });
+
+  montarParedes(retangulos).forEach(function (caixa) {
+    facesDaCaixa(caixa, "#c9ccd8").forEach(function (f) { faces.push(f); });
+  });
+
+  // Descarta as faces de costas e as que caem atrás da câmera; ordena o resto
+  // do mais distante para o mais próximo (pintor).
+  const prontas = [];
+  faces.forEach(function (f) {
+    let cx = 0, cy = 0, cz = 0;
+    for (let i = 0; i < f.v.length; i++) { cx += f.v[i][0]; cy += f.v[i][1]; cz += f.v[i][2]; }
+    const meio = [cx / f.v.length, cy / f.v.length, cz / f.v.length];
+    if (ponto3(f.n, sub3(meio, cam.olho)) >= 0) return;   // de costas
+
+    const pontos = [];
+    for (let i = 0; i < f.v.length; i++) {
+      const p = projetar(f.v[i], cam, larg, alt, foco);
+      if (!p) return;
+      pontos.push(p);
+    }
+    const d = sub3(meio, cam.olho);
+    prontas.push({ f: f, pontos: pontos, dist: ponto3(d, d), meio: meio });
+  });
+  prontas.sort(function (a, b) { return b.dist - a.dist; });
+
+  prontas.forEach(function (item) {
+    const brilho = 0.45 + 0.55 * Math.max(0, ponto3(item.f.n, luz));
+    ctx.beginPath();
+    ctx.moveTo(item.pontos[0][0], item.pontos[0][1]);
+    for (let i = 1; i < item.pontos.length; i++) ctx.lineTo(item.pontos[i][0], item.pontos[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = clarear(item.f.cor, item.f.piso ? brilho * 0.55 : brilho);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  if (mostrarNomes) {
+    ctx.textAlign = "center";
+    prontas.forEach(function (item) {
+      if (!item.f.piso) return;
+      const r = item.f.rotulo;
+      const p = projetar([r.x + r.largura / 2, r.y + r.profundidade / 2, 0.05], cam, larg, alt, foco);
+      if (!p) return;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      const texto = r.nome;
+      const medida = r.largura.toFixed(2).replace(".", ",") + " x " +
+        r.profundidade.toFixed(2).replace(".", ",") + " m";
+      ctx.font = "bold 12px Syne, sans-serif";
+      const w = Math.max(ctx.measureText(texto).width, ctx.measureText(medida).width) + 14;
+      ctx.fillRect(p[0] - w / 2, p[1] - 16, w, 32);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(texto, p[0], p[1] - 3);
+      ctx.font = "10px 'Space Mono', monospace";
+      ctx.fillStyle = "#c9ccd8";
+      ctx.fillText(medida, p[0], p[1] + 11);
+    });
+  }
+
+  // Área total, canto inferior
+  let area = 0;
+  retangulos.forEach(function (r) { area += r.largura * r.profundidade; });
+  ctx.textAlign = "left";
+  ctx.font = "11px 'Space Mono', monospace";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillText("área dos cômodos: " + area.toFixed(2).replace(".", ",") + " m² · " +
+    maxX.toFixed(2).replace(".", ",") + " x " + maxY.toFixed(2).replace(".", ",") + " m",
+    14, alt - 14);
+}
+
+// ── Controles ─────────────────────────────────────────────────────────────
+function girarMaquete(quanto) {
+  camera3d.az += quanto;
+  desenhar3d();
+}
+
+function vistaDeCima() {
+  camera3d.el = 1.45;
+  camera3d.az = -Math.PI / 2;
+  desenhar3d();
+}
+
+function vistaPadrao() {
+  camera3d.az = -0.9;
+  camera3d.el = 0.62;
+  camera3d.dist = distanciaBoa();
+  desenhar3d();
+}
+
+function distanciaBoa() {
+  const r = montarRetangulos(comodosDaPlanta);
+  let maxX = 0, maxY = 0;
+  r.forEach(function (c) {
+    if (c.x + c.largura > maxX) maxX = c.x + c.largura;
+    if (c.y + c.profundidade > maxY) maxY = c.y + c.profundidade;
+  });
+  return Math.max(12, Math.sqrt(maxX * maxX + maxY * maxY) * 1.9);
+}
+
+function alternarNomes() {
+  mostrarNomes = !mostrarNomes;
+  desenhar3d();
+}
+
+function ajustarPeDireito(valor) {
+  peDireito = Number(valor);
+  const rotulo = document.getElementById("pe-direito-valor");
+  if (rotulo) rotulo.textContent = peDireito.toFixed(1).replace(".", ",") + " m";
+  desenhar3d();
+}
+
+function ligarArrasto() {
+  const tela = document.getElementById("tela3d");
+  if (!tela || tela.dataset.ligado) return;
+  tela.dataset.ligado = "1";
+
+  let arrastando = false, ux = 0, uy = 0;
+  function comecar(x, y) { arrastando = true; ux = x; uy = y; }
+  function mover(x, y) {
+    if (!arrastando) return;
+    camera3d.az -= (x - ux) * 0.01;
+    // Trava a elevação: passar do zênite virava a cena de cabeça para baixo.
+    camera3d.el = Math.max(0.08, Math.min(1.5, camera3d.el + (y - uy) * 0.008));
+    ux = x; uy = y;
+    desenhar3d();
+  }
+  function parar() { arrastando = false; }
+
+  tela.addEventListener("pointerdown", function (e) { comecar(e.clientX, e.clientY); tela.setPointerCapture(e.pointerId); });
+  tela.addEventListener("pointermove", function (e) { mover(e.clientX, e.clientY); });
+  tela.addEventListener("pointerup", parar);
+  tela.addEventListener("pointercancel", parar);
+  tela.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    camera3d.dist = Math.max(4, Math.min(200, camera3d.dist * (e.deltaY > 0 ? 1.12 : 0.89)));
+    desenhar3d();
+  }, { passive: false });
+}
+
+// ── Tabela editável ───────────────────────────────────────────────────────
+function renderizarTabelaDeComodos() {
+  const corpo = document.getElementById("comodos-corpo");
+  if (!corpo) return;
+  corpo.innerHTML = "";
+
+  const cabecalho = document.createElement("tr");
+  ["Cômodo", "Fileira", "Largura", "Profund.", ""].forEach(function (t) {
+    const th = document.createElement("th");
+    th.textContent = t;
+    cabecalho.appendChild(th);
+  });
+  corpo.appendChild(cabecalho);
+
+  comodosDaPlanta.forEach(function (c, i) {
+    const tr = document.createElement("tr");
+
+    function campo(valor, chave, numerico) {
+      const td = document.createElement("td");
+      const inp = document.createElement("input");
+      inp.value = valor;
+      if (numerico) { inp.className = "num"; inp.inputMode = "decimal"; }
+      inp.oninput = function () {
+        if (numerico) {
+          const v = Number(String(inp.value).replace(",", "."));
+          if (!isNaN(v)) comodosDaPlanta[i][chave] = v;
+        } else {
+          comodosDaPlanta[i][chave] = inp.value;
+        }
+        desenhar3d();
+      };
+      td.appendChild(inp);
+      return td;
+    }
+
+    tr.appendChild(campo(c.nome, "nome", false));
+    tr.appendChild(campo(c.fileira, "fileira", true));
+    tr.appendChild(campo(String(c.largura).replace(".", ","), "largura", true));
+    tr.appendChild(campo(String(c.profundidade).replace(".", ","), "profundidade", true));
+
+    const tdX = document.createElement("td");
+    const x = document.createElement("button");
+    x.className = "apagar";
+    x.textContent = "×";
+    x.title = "Remover este cômodo";
+    x.onclick = function () {
+      comodosDaPlanta.splice(i, 1);
+      renderizarTabelaDeComodos();
+      desenhar3d();
+    };
+    tdX.appendChild(x);
+    tr.appendChild(tdX);
+    corpo.appendChild(tr);
+  });
+}
+
+function acrescentarComodo() {
+  comodosDaPlanta.push({ nome: "Novo cômodo", fileira: 1, largura: 3, profundidade: 3 });
+  renderizarTabelaDeComodos();
+  desenhar3d();
+}
+
+// Quando uma fileira fica muito mais larga que a outra, quase sempre é um
+// cômodo que o modelo colocou na fileira errada — vale avisar em vez de deixar
+// a maquete sair torta sem explicação.
+function avaliarFileiras() {
+  const alerta = document.getElementById("maquete-alerta");
+  if (!alerta) return;
+  alerta.innerHTML = "";
+
+  const larguras = {};
+  comodosDaPlanta.forEach(function (c) {
+    const f = c.fileira || 1;
+    larguras[f] = (larguras[f] || 0) + c.largura;
+  });
+  const valores = Object.keys(larguras).map(function (k) { return larguras[k]; });
+  if (valores.length < 2) return;
+
+  const maior = Math.max.apply(null, valores);
+  const menor = Math.min.apply(null, valores);
+  if (maior <= menor * 1.6) return;
+
+  const aviso = document.createElement("div");
+  aviso.className = "maquete-aviso";
+  aviso.textContent = "As fileiras ficaram bem desiguais (" +
+    valores.map(function (v) { return v.toFixed(1).replace(".", ",") + " m"; }).join(" x ") +
+    "). Isso costuma ser um cômodo lido na fileira errada — confira a coluna " +
+    "Fileira abaixo. A maquete se refaz na hora.";
+  alerta.appendChild(aviso);
+}
+
+// ── Abrir e fechar ────────────────────────────────────────────────────────
+function abrirMaquete(comodos) {
+  comodosDaPlanta = comodos.map(function (c) {
+    return {
+      nome: c.nome, fileira: Number(c.fileira) || 1,
+      largura: Number(c.largura) || 0, profundidade: Number(c.profundidade) || 0,
+    };
+  }).filter(function (c) { return c.largura > 0 && c.profundidade > 0; });
+
+  document.getElementById("maquete-fundo").classList.add("aberto");
+  ligarArrasto();
+  renderizarTabelaDeComodos();
+  avaliarFileiras();
+  vistaPadrao();
+}
+
+function fecharMaquete() {
+  document.getElementById("maquete-fundo").classList.remove("aberto");
+}
+
+function baixarMaquete() {
+  const tela = document.getElementById("tela3d");
+  tela.toBlob(function (b) {
+    const agora = new Date();
+    baixarBlob(b, "maquete-" + agora.getHours() + "h" +
+      String(agora.getMinutes()).padStart(2, "0") + ".png");
+  }, "image/png");
+}
+
+function baixarPlanilhaDeComodos() {
+  const matriz = [["Cômodo", "Fileira", "Largura (m)", "Profundidade (m)", "Área (m²)"]];
+  let total = 0;
+  comodosDaPlanta.forEach(function (c) {
+    const area = c.largura * c.profundidade;
+    total += area;
+    matriz.push([c.nome, c.fileira, c.largura, c.profundidade, Number(area.toFixed(2))]);
+  });
+  matriz.push(["TOTAL", "", "", "", Number(total.toFixed(2))]);
+  baixarMatriz(matriz, "comodos.xlsx");
+}
+
+// ── Ligação com a conversa ────────────────────────────────────────────────
+// Pedido de 3D só vale com imagem anexada: sem a planta não há o que ler.
+const PEDE_3D = /\b(3d|3-?d|tr[êe]s dimens\w*|maquete|volumetria|perspectiva)\b/i;
+
+async function plantaEmTresDimensoes(base64) {
+  if (!navigator.onLine) { avisarSemInternet(); return; }
+
+  rosto("pensando");
+  const typingEl = appendTyping();
+  passo(typingEl, "📐 lendo os cômodos da planta…");
+
+  try {
+    const res = await enviarAoServidor({ planta: base64 });
+    let dados = null;
+    try { dados = await res.json(); } catch (e) { /* resposta ilegível */ }
+    typingEl.remove();
+
+    if (!res.ok || !dados || !dados.comodos || !dados.comodos.length) {
+      appendMessage("ai", (dados && dados.error && dados.error.message) ||
+        "Não consegui ler os cômodos desta planta.");
+      return;
+    }
+
+    rosto("contente", 1200);
+    const lista = dados.comodos.map(function (c) {
+      return "| " + c.nome + " | " + String(c.largura).replace(".", ",") + " | " +
+        String(c.profundidade).replace(".", ",") + " | " +
+        (c.largura * c.profundidade).toFixed(2).replace(".", ",") + " |";
+    }).join("\n");
+    let total = 0;
+    dados.comodos.forEach(function (c) { total += c.largura * c.profundidade; });
+
+    appendMessage("ai", "Li " + dados.comodos.length + " cômodos na planta e montei a " +
+      "maquete. Confira as medidas — é um estudo de volumes, sem portas nem janelas.\n\n" +
+      "| Cômodo | Largura | Profundidade | Área m² |\n|---|---|---|---|\n" + lista +
+      "\n\nÁrea somada: **" + total.toFixed(2).replace(".", ",") + " m²**.");
+
+    abrirMaquete(dados.comodos);
+  } catch (e) {
+    typingEl.remove();
+    appendMessage("ai", (e && e.message) || "Não consegui ler a planta.");
+  }
+}
 
 // ── Funcionar sem internet ────────────────────────────────────────────────
 // O app inteiro fica guardado no aparelho por um service worker (sw.js), e

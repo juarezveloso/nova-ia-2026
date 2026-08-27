@@ -97,6 +97,11 @@ export default {
     const historico = Array.isArray(body.messages) ? body.messages : [];
     const sistema = typeof body.system === 'string' ? body.system : '';
 
+    // ── Caminho 0: planta baixa → lista de cômodos para montar em 3D ─────────
+    if (typeof body.planta === 'string' && body.planta) {
+      return await analisarPlanta(env, body);
+    }
+
     // ── Caminho 0: pedido de desenho → gera ou edita uma imagem ──────────────
     // Campo 'desenhar' (e não 'image', que já é a imagem enviada para análise).
     if (typeof body.desenhar === 'string' && body.desenhar) {
@@ -412,6 +417,132 @@ async function gerarImagem(env, body) {
     if (body.debug) erro.bruto = e && e.message ? e.message : String(e);
     return jsonResponse({ error: erro }, 502);
   }
+}
+
+// ── Planta baixa → 3D ─────────────────────────────────────────────────────
+// Medido em 27/08/2026 com uma planta de verdade conhecida: o modelo de visão
+// lê os NOMES e as MEDIDAS escritas dentro dos cômodos com precisão total
+// (5 de 5 cômodos, todas as medidas exatas). O que ele NÃO sabe fazer é
+// calcular a posição absoluta: pedindo X e Y em metros, ele devolveu a própria
+// largura do cômodo no lugar do X. O que ele acerta é a ORDEM — em que fileira
+// cada cômodo está e a sequência da esquerda para a direita. Com isso mais as
+// medidas reais, a planta é remontada por acumulação de larguras.
+// O texto do pedido decide o resultado. Sem a primeira linha e sem o exemplo, o
+// modelo devolvia lista numerada em prosa ("1. Nome: 2. Fileira:") e chegou a
+// inventar um título — a mesma imagem que ele lê com precisão total quando o
+// formato está ancorado por um exemplo concreto.
+const PERGUNTA_PLANTA =
+  'Responda sempre em português brasileiro.\n\n' +
+  'Esta é uma planta baixa de arquitetura. Liste os cômodos, um por linha, neste formato:\n' +
+  'NOME;FILEIRA;LARGURA;PROFUNDIDADE\n\n' +
+  'Exemplo de resposta correta:\n' +
+  'SALA;1;5.00;4.00\n' +
+  'COZINHA;1;3.00;4.00\n' +
+  'QUARTO;2;3.50;3.50\n\n' +
+  'FILEIRA é 1 para a faixa de cômodos mais de cima, 2 para a faixa seguinte, ' +
+  'contando de cima para baixo. Dentro de cada fileira, liste da ESQUERDA para a ' +
+  'DIREITA. LARGURA e PROFUNDIDADE são os números em metros escritos dentro do ' +
+  'cômodo, largura primeiro. Não invente cômodos nem medidas.\n' +
+  'Responda apenas com as linhas. Sem título, sem numeração, sem comentário.';
+
+// Aceita ; ou | como separador e não depende da ordem dos campos: o modelo
+// troca a ordem com frequência, mas os tipos são inconfundíveis — a fileira é
+// um inteiro pequeno, as medidas têm decimal, e o nome não é número.
+function lerLinhaDeComodo(linha) {
+  const partes = linha.split(/[;|\t]/).map(function (p) { return p.trim(); })
+    .filter(function (p) { return p.length; });
+  if (partes.length < 3) return null;
+
+  let nome = '';
+  let fileira = 0;
+  const medidas = [];
+
+  partes.forEach(function (p) {
+    // Tira a unidade escrita junto ("5,00 m") antes de decidir se é número.
+    // Sem isso, a medida com unidade caía como texto e o cômodo se perdia.
+    // As mais longas vêm primeiro: a alternância casa a primeira que servir, e
+    // "m" sozinho engoliria o "m" de "mm". O nome do cômodo não corre risco —
+    // se sobrar texto, ele cai no ramo do nome, que usa a parte original.
+    const semUnidade = p.replace(/\s*(metros?|mts?|m²|m2|mm|cm|m)\s*$/i, '').trim();
+    const numero = semUnidade.replace(',', '.');
+    const ehNumero = /^[0-9]+(\.[0-9]+)?$/.test(numero);
+    if (!ehNumero) {
+      if (!nome) nome = p;
+      return;
+    }
+    const valor = Number(numero);
+    // Inteiro de 1 a 9 sem decimal é a fileira; o resto é medida.
+    if (!fileira && numero.indexOf('.') === -1 &&
+        valor >= 1 && valor <= 9) {
+      fileira = valor;
+      return;
+    }
+    medidas.push(valor);
+  });
+
+  if (!nome) return null;
+  return {
+    nome: nome.slice(0, 40),
+    fileira: fileira || 1,
+    largura: medidas[0] || 0,
+    profundidade: medidas[1] || 0,
+  };
+}
+
+function lerComodos(texto) {
+  const comodos = [];
+  String(texto).split('\n').forEach(function (linha) {
+    const limpa = linha.trim();
+    if (!limpa || limpa.indexOf(';') === -1 && limpa.indexOf('|') === -1) return;
+    // Descarta um eventual cabeçalho que o modelo insista em escrever.
+    if (/nome\s*[;|]\s*fileira/i.test(limpa)) return;
+    const c = lerLinhaDeComodo(limpa);
+    if (c && c.largura > 0 && c.profundidade > 0) comodos.push(c);
+  });
+  return comodos;
+}
+
+async function analisarPlanta(env, body) {
+  let bytes;
+  try {
+    bytes = base64ParaBytes(body.planta);
+  } catch (e) {
+    return jsonResponse({ error: { message: 'Imagem da planta inválida.' } }, 400);
+  }
+
+  const modelos = [MODELO_VISAO, MODELO_VISAO_RESERVA];
+  let ultima = null;
+
+  for (let i = 0; i < modelos.length; i++) {
+    try {
+      // Pelo repetidor, como no resto do Worker: uma tentativa só falha quando
+      // o modelo está momentaneamente sem capacidade (erro 3040).
+      const r = await chamarIA(env, modelos[i], {
+        image: bytes, prompt: PERGUNTA_PLANTA, max_tokens: 700,
+      }, null);
+      const saida = r.resultado;
+      const texto = (saida.response || saida.description || saida.text || '').trim();
+      const comodos = lerComodos(texto);
+      if (comodos.length) {
+        return jsonResponse({ comodos: comodos, bruto: texto, modelo: modelos[i] }, 200);
+      }
+      // Leu, mas não achou cômodo nenhum: guarda para explicar ao usuário.
+      ultima = new Error('não reconheci cômodos nesta imagem');
+      ultima.bruto = texto;
+    } catch (e) {
+      ultima = e;
+    }
+  }
+
+  return jsonResponse({
+    error: {
+      message: 'Não consegui identificar os cômodos nesta planta. Funciona melhor ' +
+        'quando cada cômodo tem o nome e as medidas escritas dentro dele.',
+      bruto: ultima && ultima.bruto ? ultima.bruto : undefined,
+      // O texto cru do erro só sai a pedido: ajuda a diagnosticar sem poluir a tela.
+      causa: body.debug && ultima ? (ultima.message || String(ultima)) : undefined,
+    },
+  }, 422);
 }
 
 // Analisa uma imagem (ou página escaneada) com o modelo de visão.
