@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6c63ff">
+<link rel="icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bebi">
 <title>Bebi</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
@@ -557,6 +563,9 @@
     .cartao-previa { font-size: 9px; }
   }
 
+  /* ── Sinal de que está sem internet ─────────────────────── */
+  .status-dot.offline { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; animation: none; }
+
   /* ── Painel lateral de conversas ────────────────────────── */
   #menu-btn {
     background: transparent; border: none; padding: 0; margin-right: 2px;
@@ -890,7 +899,7 @@
 </div>
   <div class="header-info">
     <h1>Bebi</h1>
-    <p><span class="status-dot"></span>Online<span class="so-tela-larga"> — base atualizada até 2026</span></p>
+    <p><span class="status-dot" id="ponto-estado"></span><span id="estado-texto">Online</span><span class="so-tela-larga" id="estado-extra"> — base atualizada até 2026</span></p>
   </div>
   <div id="velocidade">
     <button data-modelo="rapido" onclick="escolherVelocidade('rapido')" title="Respostas em poucos segundos, mais simples">⚡ rápido</button>
@@ -902,7 +911,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.22</div>
+  <div class="badge">v2026.23</div>
 </header>
 
 
@@ -963,7 +972,7 @@ Como posso te ajudar hoje?</div>
       <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
   </div>
-  <p class="hint">Enter para enviar • 🎤 fale • 📎 anexe PDF, Word, Excel • 🎨 desenhe (ou peça "desenhe um...")</p>
+  <p class="hint">Enter para enviar • 🎤 fale • 📎 anexe PDF, Word, Excel • 🎨 desenhe • 📴 abre sem internet</p>
 </div>
 
 <script>
@@ -1054,6 +1063,13 @@ async function sendMessage() {
 
   const prontos = anexos.filter(function (a) { return a.status === 'pronto'; });
   if (!texto && !prontos.length) return;
+
+  // Sem internet a IA não responde: avisamos ANTES de limpar o campo, para
+  // o texto não se perder.
+  if (!navigator.onLine) {
+    avisarSemInternet();
+    return;
+  }
 
   document.getElementById('suggestions').style.display = 'none';
   input.value = '';
@@ -2698,6 +2714,11 @@ async function desenharNaConversa(pedido, origemBase64) {
     return;
   }
 
+  if (!navigator.onLine) {
+    avisarSemInternet();
+    return;
+  }
+
   rosto('pensando');
   const typingEl = appendTyping();
   passo(typingEl, origemBase64 ? '👁️ olhando a sua imagem…' : '🎨 preparando o desenho…');
@@ -3006,6 +3027,59 @@ function promptComMemoria() {
 }
 
 carregarMemoria();
+
+// ── Funcionar sem internet ────────────────────────────────────────────────
+// O app inteiro fica guardado no aparelho por um service worker (sw.js), e
+// dá para instalar na tela inicial do celular.
+//
+// O que NÃO funciona offline, e não tem como funcionar: a resposta da IA.
+// Ela é calculada no servidor da Cloudflare. Rodar um modelo de qualidade
+// dentro do navegador exigiria baixar de 1 a 4 GB e uma placa de vídeo que o
+// celular não tem — prometer isso seria mentira.
+//
+// O que funciona sem internet: abrir o app, ler as conversas guardadas,
+// anexar e ler documentos, gerar planilha/Word/PDF, tratar imagens e a
+// leitura em voz alta.
+function atualizarEstadoDaRede() {
+  const online = navigator.onLine;
+  const ponto = document.getElementById('ponto-estado');
+  const texto = document.getElementById('estado-texto');
+  const extra = document.getElementById('estado-extra');
+  if (ponto) ponto.classList.toggle('offline', !online);
+  if (texto) texto.textContent = online ? 'Online' : 'Sem internet';
+  if (extra) {
+    extra.textContent = online
+      ? ' — base atualizada até 2026'
+      : ' — dá para ler, anexar e gerar arquivos';
+  }
+}
+
+function avisarSemInternet() {
+  appendMessage('ai', 'Estou sem internet agora, então não consigo pensar numa ' +
+    'resposta — isso acontece no servidor, não aqui no aparelho. Seu texto ' +
+    'continua no campo, é só tocar em enviar quando o sinal voltar.\n\n' +
+    'Enquanto isso, funciona tudo o que é feito aqui: abrir as conversas ' +
+    'guardadas, anexar e ler documentos, gerar planilha, Word e PDF, tratar ' +
+    'imagens e a leitura em voz alta.');
+}
+
+window.addEventListener('online', function () {
+  atualizarEstadoDaRede();
+  // Não reenviamos sozinhos: uma mensagem saindo minutos depois, sem o
+  // usuário esperar, assusta mais do que ajuda. O texto está lá, é só enviar.
+  mostrarStatusVoz('✅ internet de volta — pode enviar');
+  setTimeout(function () { mostrarStatusVoz(''); }, 3500);
+});
+window.addEventListener('offline', atualizarEstadoDaRede);
+atualizarEstadoDaRede();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    // Sem service worker o site continua funcionando normalmente: só perde
+    // a parte offline. Por isso a falha é silenciosa.
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
 
 // ── Conversas guardadas (painel lateral) ──────────────────────────────────
 // Tudo isto vive no navegador do visitante: nenhuma conversa vai para
