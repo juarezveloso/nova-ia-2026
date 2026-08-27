@@ -1003,7 +1003,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.24</div>
+  <div class="badge">v2026.25</div>
 </header>
 
 
@@ -3152,7 +3152,10 @@ const CORES_COMODO = ["#6c63ff", "#22b8a6", "#f59e0b", "#ec4899", "#3b82f6",
 let comodosDaPlanta = [];
 let peDireito = 2.8;
 let mostrarNomes = true;
-const camera3d = { az: -0.9, el: 0.62, dist: 26 };
+// 60 graus acima do chao, e nao 36: medido sondando o pixel do piso de cada
+// comodo. Mais baixo que isso, a parede da frente esconde os comodos do fundo
+// -- fisicamente correto, mas inutil para quem quer conferir a planta.
+const camera3d = { az: -0.9, el: 1.05, dist: 26 };
 
 // ── Vetores ───────────────────────────────────────────────────────────────
 function sub3(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
@@ -3393,7 +3396,7 @@ function vistaDeCima() {
 
 function vistaPadrao() {
   camera3d.az = -0.9;
-  camera3d.el = 0.62;
+  camera3d.el = 1.05;
   camera3d.dist = distanciaBoa();
   desenhar3d();
 }
