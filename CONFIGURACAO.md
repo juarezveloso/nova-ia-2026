@@ -572,3 +572,18 @@ Só inclua domínios públicos em que você confia.
 
 Execute `node --test` na raiz com Node.js 22 ou mais recente. Os testes usam respostas
 simuladas para o Workers AI e fontes externas, sem consumir a cota de produção.
+
+### Treinar a Bebi com exemplos
+
+Abra o botão de memória e expanda **Treinar com exemplos**. Salve uma pergunta ou
+situação e a resposta esperada. Para corrigir um exemplo, salve de novo a mesma
+pergunta com a resposta revisada. O navegador guarda até 200 exemplos e 200 fatos
+locais. A Bebi seleciona até três exemplos relacionados a cada pergunta e os usa
+como referência no Workers AI. Os exemplos podem ser removidos individualmente
+ou pelo botão **esquecer tudo**.
+
+Esse treinamento por exemplos personaliza o contexto das respostas. Os pesos do
+modelo hospedado no Workers AI são administrados pelo provedor.
+
+A suíte `node --test` inclui um milhão de casos gerados determinísticos para
+seleção, atualização e isolamento de exemplos, além dos testes do Worker.
