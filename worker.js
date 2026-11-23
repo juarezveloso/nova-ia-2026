@@ -172,7 +172,7 @@ export default {
     // Perguntas claramente dependentes de dado atual disparam a pesquisa sozinhas.
     // Antes dependíamos só do modelo escrever BUSCAR, e ele nem sempre escrevia —
     // foi assim que "qual a PTAX de hoje?" passou sem consultar cotação nenhuma.
-    const PADRAO_ATUAL = /ptax|d[óo]lar|dolar|euro|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|selic|ipca|incc|infla[çc][ãa]o|juros|ibovespa|b[óo]lsa|not[íi]cia|[úu]ltimas|hoje|agora|atual|recente|pre[çc]o|quanto (est[áa]|custa)|o que (aconteceu|houve)/i;
+    const PADRAO_ATUAL = /ptax|d[óo]lar|dolar|euro|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|selic|ipca|incc|infla[çc][ãa]o|juros|ibovespa|b[óo]lsa|not[íi]cia|[úu]ltimas|hoje|agora|atual|recente|pre[çc]o|quanto (est[áa]|custa)|o que (aconteceu|houve)|nasa|miss(?:[ãa]o|[õo]es)|lan[çc]amento|expedi[çc][ãa]o espacial|\b20?26\b/i;
 
     let jaPesquisou = false;
     if (alvo && !enderecos.length && PADRAO_ATUAL.test(alvo.content)) {
@@ -798,7 +798,7 @@ async function buscarNoticias(termos) {
   try {
     const url = 'https://www.bing.com/news/search?q=' + encodeURIComponent(termos) +
       '&format=RSS&cc=br&setlang=pt-BR';
-    const r = await fetch(url, { headers: { 'User-Agent': 'NovaIA2026/1.0' } });
+    const r = await comPrazo(fetch(url, { headers: { 'User-Agent': 'NovaIA2026/1.0' } }), PRAZO_BUSCA);
     if (r.ok) {
       const itens = extrairItens(await r.text(), 6);
       if (itens.length) return itens;
@@ -983,12 +983,17 @@ async function lerPagina(endereco) {
 async function pesquisar(termos) {
   const fontes = [];
   const partes = [];
+  const anoCorrigido = /nasa|miss(?:[ãa]o|[õo]es)/i.test(termos) && /\b226\b/.test(termos);
+  if (anoCorrigido) {
+    termos = termos.replace(/\b226\b/g, '2026');
+    partes.push('Correção de contexto: interprete “226” como “2026” na pergunta sobre missões da NASA.');
+  }
 
   const querCotacao = /ptax|d[óo]lar|dolar|euro|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|usd|brl/i.test(termos);
   const querIndicador = /selic|ipca|incc|infla[çc][ãa]o|juros|[íi]ndice|economia|custo da constru/i.test(termos);
   const resultados = await Promise.all([
     comPrazo(buscarNoticias(termos), PRAZO_BUSCA).catch(function () { return null; }),
-    /not[íi]cia|recente|[úu]ltimas|hoje|agora|atual/i.test(termos)
+    /not[íi]cia|recente|[úu]ltimas|hoje|agora|atual|nasa|miss(?:[ãa]o|[õo]es)|lan[çc]amento|\b2026\b/i.test(termos)
       ? Promise.resolve(null)   // pergunta de notícia: enciclopédia só atrapalha
       : comPrazo(buscarWikipedia(termos), PRAZO_BUSCA).catch(function () { return null; }),
     querCotacao ? comPrazo(buscarCotacoes(termos), PRAZO_BUSCA).catch(function () { return null; })
