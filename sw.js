@@ -9,9 +9,8 @@
 // guardadas, anexar e ler documentos (PDF, Word, Excel), gerar planilha, Word e
 // PDF, tratar imagens (girar, P&B, contraste) e a leitura em voz alta.
 
-const VERSAO = 'bebi-v26';
-const CACHE_APP = 'app-' + VERSAO;
-const CACHE_LIBS = 'libs-' + VERSAO;
+const CACHE_APP = 'app-bebi-v27';
+const CACHE_LIBS = 'libs-bebi-v26';
 
 const APP = [
   './',
@@ -19,7 +18,7 @@ const APP = [
   './manifest.json',
   './icone-192.png',
   './icone-512.png',
-];
+].map(function (caminho) { return new URL(caminho, self.registration.scope).href; });
 
 // Bibliotecas com a versão fixa na URL: nunca mudam de conteúdo, então podem
 // ficar no cache para sempre.
@@ -44,7 +43,7 @@ self.addEventListener('activate', function (evento) {
   evento.waitUntil(
     caches.keys().then(function (nomes) {
       return Promise.all(nomes.map(function (n) {
-        if (n !== CACHE_APP && n !== CACHE_LIBS) return caches.delete(n);
+        if (/^app-bebi-v\d+$/.test(n) && n !== CACHE_APP) return caches.delete(n);
         return null;
       }));
     }).then(function () {
@@ -78,30 +77,39 @@ self.addEventListener('fetch', function (evento) {
   if (url.hostname === 'cdnjs.cloudflare.com' ||
       url.hostname === 'fonts.googleapis.com' ||
       url.hostname === 'fonts.gstatic.com') {
-    evento.respondWith(
-      caches.match(pedido).then(function (achado) {
-        if (achado) return achado;
-        return fetch(pedido).then(function (resposta) {
-          const copia = resposta.clone();
-          caches.open(CACHE_LIBS).then(function (c) { c.put(pedido, copia); });
-          return resposta;
-        });
-      })
-    );
+    evento.respondWith((async function () {
+      const cache = await caches.open(CACHE_LIBS);
+      const achado = await cache.match(pedido);
+      if (achado) return achado;
+      const resposta = await fetch(pedido);
+      if (resposta.ok || resposta.type === 'opaque') {
+        await cache.put(pedido, resposta.clone()).catch(function () {});
+      }
+      return resposta;
+    })());
     return;
   }
 
-  // A página: rede primeiro, para a atualização chegar sozinha; o cache entra
-  // quando está offline.
-  evento.respondWith(
-    fetch(pedido).then(function (resposta) {
-      const copia = resposta.clone();
-      caches.open(CACHE_APP).then(function (c) { c.put(pedido, copia); });
-      return resposta;
-    }).catch(function () {
-      return caches.match(pedido).then(function (achado) {
-        return achado || caches.match('./index.html');
-      });
-    })
-  );
+  // As consultas na URL de abertura também usam a página salva offline.
+  url.search = '';
+  url.hash = '';
+  const arquivo = url.href;
+  if (!APP.includes(arquivo)) return;
+
+  // Uma falha de rede ou do servidor não substitui a cópia local.
+  evento.respondWith((async function () {
+    const cache = await caches.open(CACHE_APP);
+    try {
+      const resposta = await fetch(pedido);
+      if (resposta.ok) {
+        await cache.put(arquivo, resposta.clone()).catch(function () {});
+        return resposta;
+      }
+      return (await cache.match(arquivo)) || resposta;
+    } catch (erro) {
+      const achado = await cache.match(arquivo);
+      if (achado) return achado;
+      throw erro;
+    }
+  })());
 });
