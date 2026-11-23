@@ -794,11 +794,10 @@
   .rosto .olho, .rosto .boca, .rosto .sobrancelha {
     transform-box: fill-box; transform-origin: center;
   }
-  .rosto .olho { fill: #fff; animation: piscar 5.5s infinite; }
-  .rosto .brilho { fill: rgba(255,255,255,0.9); }
-  .rosto .pupila { fill: #1b1b2f; }
-  .rosto .boca { fill: none; stroke: #fff; stroke-width: 6; stroke-linecap: round; }
-  .rosto .boca-aberta { fill: #1b1b2f; opacity: 0; }
+  .rosto .olho { fill: #fff9f5; stroke: #51313d; stroke-width: 1; animation: piscar 5.5s infinite; }
+  .rosto .pupila { fill: #392735; stroke: none; }
+  .rosto .boca { fill: none; stroke: #a14360; stroke-width: 2.8; stroke-linecap: round; }
+  .rosto .boca-aberta { fill: #862e4c; opacity: 0; transform-box: fill-box; transform-origin: center; }
 
   @keyframes piscar {
     0%, 90%, 100% { transform: scaleY(1); }
@@ -841,8 +840,12 @@
     100% { transform: scaleY(1); }
   }
 
-  .avatar { cursor: pointer; }
-  .msg-avatar.ai .rosto .boca { stroke-width: 7; }
+  #rosto-ia { cursor: pointer; border: 0; padding: 0; }
+  #rosto-ia:focus-visible { outline: 2px solid var(--accent2); outline-offset: 3px; }
+  .avatar.respondendo { box-shadow: 0 0 0 2px var(--accent2); }
+  @media (prefers-reduced-motion: reduce) {
+    #rosto-ia, .rosto, .rosto * { animation: none !important; }
+  }
 
   /* ── Memória (o que a IA aprendeu) ──────────────────────── */
   #memoria-btn {
@@ -973,22 +976,33 @@
 
 <header>
   <button id="menu-btn" onclick="alternarPainel()" title="Suas conversas">&#9776;</button>
-  <div class="avatar" id="rosto-ia" onclick="cutucarRosto()" title="Bebi">
+  <button type="button" class="avatar" id="rosto-ia" onclick="cutucarRosto()" title="Bebi" aria-label="Cumprimentar a Bebi">
   <svg class="rosto" viewBox="0 0 100 100" aria-hidden="true">
-    <g class="olho olho-esq">
-      <ellipse cx="34" cy="42" rx="9" ry="11"/>
-      <circle class="pupila" cx="34" cy="43" r="4.5"/>
-      <circle class="brilho" cx="36" cy="39" r="1.8"/>
+    <path fill="#2b1937" d="M18 73V42C18 18 32 8 50 8s33 11 33 34v31c-8 8-20 13-33 13S25 81 18 73Z"/>
+    <path fill="#7e5cc7" d="M12 100c3-19 17-25 38-25s35 6 38 25Z"/>
+    <path fill="#eee4ff" d="m36 77 14 20 14-20Z"/>
+    <path fill="#eab29e" d="M42 68h16v14c-4 5-12 5-16 0Z"/>
+    <ellipse cx="25" cy="52" rx="5" ry="7" fill="#edb7a6"/>
+    <ellipse cx="75" cy="52" rx="5" ry="7" fill="#edb7a6"/>
+    <path fill="#ffe3ce" d="M26 39c0-16 12-23 24-23s24 7 24 23v12c0 17-12 28-24 28S26 68 26 51Z"/>
+    <path fill="#201729" d="M19 46C15 25 27 8 48 8c20 0 34 13 35 32l-8 12c0-10-2-19-7-24-8 10-20 14-37 15l3-8c-5 4-8 10-9 17Z"/>
+    <path fill="none" stroke="#52405f" stroke-width="2.8" stroke-linecap="round" d="M27 32c5-13 18-19 29-17m5 1 5 2"/>
+    <path fill="none" stroke="#73505a" stroke-width="1.7" stroke-linecap="round" d="M32 47q5-3 11-1m14 0q6-2 11 1"/>
+    <g class="olho">
+      <path d="M30 52q7-5 16 1c-5 6-12 6-16-1Z"/>
+      <circle class="pupila" cx="38.7" cy="53.4" r="3.3"/>
     </g>
-    <g class="olho olho-dir">
-      <ellipse cx="66" cy="42" rx="9" ry="11"/>
-      <circle class="pupila" cx="66" cy="43" r="4.5"/>
-      <circle class="brilho" cx="68" cy="39" r="1.8"/>
+    <g class="olho">
+      <path d="M54 53q9-6 16-1c-4 7-11 7-16 1Z"/>
+      <circle class="pupila" cx="61.3" cy="53.4" r="3.3"/>
     </g>
-    <ellipse class="boca-aberta" cx="50" cy="68" rx="12" ry="9"/>
-    <path class="boca" d="M34 64 Q50 78 66 64"/>
+    <path fill="none" stroke="#d89787" stroke-width="1.6" stroke-linecap="round" d="m50 55-1 5 2 1"/>
+    <ellipse cx="34" cy="62" rx="5" ry="2.4" fill="#efa6a1" opacity=".65"/>
+    <ellipse cx="66" cy="62" rx="5" ry="2.4" fill="#efa6a1" opacity=".65"/>
+    <path class="boca" d="M43 66q7 7 14 0"/>
+    <ellipse class="boca-aberta" cx="50" cy="68" rx="6" ry="4.5"/>
   </svg>
-</div>
+  </button>
   <div class="header-info">
     <h1>Bebi</h1>
     <p><span class="status-dot" id="ponto-estado"></span><span id="estado-texto">Online</span><span class="so-tela-larga" id="estado-extra"> — horário e fontes atualizados online</span></p>
@@ -1003,7 +1017,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.29</div>
+  <div class="badge">v2026.30</div>
 </header>
 
 
@@ -1031,13 +1045,9 @@
 
   <div class="msg-row">
     <div class="msg-avatar ai">
-      <svg class="rosto" viewBox="0 0 100 100" aria-hidden="true">
-        <g class="olho"><ellipse cx="34" cy="42" rx="9" ry="11"/><circle class="pupila" cx="34" cy="43" r="4.5"/></g>
-        <g class="olho"><ellipse cx="66" cy="42" rx="9" ry="11"/><circle class="pupila" cx="66" cy="43" r="4.5"/></g>
-        <path class="boca" d="M34 64 Q50 78 66 64"/>
-      </svg>
+
     </div>
-    <div class="bubble ai">Olá! Eu sou a Bebi, sua assistente, com base de conhecimento atualizada até 2026. Posso te ajudar com perguntas sobre tecnologia, ciência, eventos recentes, cultura e muito mais.
+    <div class="bubble ai">Olá! Eu sou a Bebi, sua assistente. Posso te ajudar com perguntas sobre tecnologia, ciência, eventos recentes, cultura e muito mais.
 
 Como posso te ajudar hoje?</div>
   </div>
@@ -1072,10 +1082,9 @@ Como posso te ajudar hoje?</div>
 const WORKER_URL = 'https://nova-ia-2026.juarez-veloso.workers.dev';
 
 const history = [];
-const systemPrompt = `Você é uma assistente avançada chamada "Bebi", com base de conhecimento atualizada até maio de 2026. Você é inteligente, curiosa, direta e fala em português brasileiro de forma natural e amigável.
+const systemPrompt = `Você é uma assistente avançada chamada "Bebi". Você é inteligente, curiosa, direta e fala em português brasileiro de forma natural e amigável.
 
 Características:
-- Conhecimento atualizado sobre eventos, tecnologia, ciência, política, cultura e tendências até 2026
 - Responde de forma clara, objetiva e útil
 - Usa linguagem natural e acessível
 - Quando não souber algo com certeza, diz claramente
@@ -1141,6 +1150,8 @@ function suggest(text) {
 }
 
 async function sendMessage() {
+  const btn = document.getElementById('send-btn');
+  if (btn.disabled) return;
   pararFala();              // silencia a leitura anterior
   rosto(null);
   if (ouvindo) pararVoz();  // encerra o ditado antes de enviar
@@ -1167,7 +1178,6 @@ async function sendMessage() {
   input.value = '';
   input.style.height = 'auto';
 
-  const btn = document.getElementById('send-btn');
   btn.disabled = true;
 
   const documentos = prontos.filter(function (a) { return a.tipo === 'texto'; });
@@ -1230,6 +1240,7 @@ async function sendMessage() {
   if (imagem) conteudo = '[imagem anexada: ' + imagem.nome + ']\n' + conteudo;
 
   history.push({ role: 'user', content: conteudo });
+  if (history.length > 12) history.splice(0, history.length - 12);
 
   // Esvazia a bandeja, mas guarda imagens extras para os próximos envios
   const sobras = imagens.slice(1);
@@ -1245,7 +1256,7 @@ async function sendMessage() {
     : '💭 pensando…');
 
   try {
-    const corpo = { system: promptComMemoria(), messages: history, modelo: modeloEscolhido, fluxo: true };
+    const corpo = { system: promptComMemoria(), messages: history.slice(-12), modelo: modeloEscolhido, fluxo: true };
     if (imagem) corpo.image = imagem.base64;
 
     const res = await enviarAoServidor(corpo);
@@ -1256,8 +1267,8 @@ async function sendMessage() {
     if (emFluxo) {
       const r = await lerEmFluxo(res, typingEl);
       const separado = separarAprendizado(r.texto);
-      const resposta = separado.texto || r.texto;
-      const aprendidos = separado.fatos.filter(aprender);
+      const resposta = separado.texto || 'Não veio resposta. Tente de novo.';
+      const aprendidos = aprenderFatos(separado.fatos);
 
       history.push({ role: 'assistant', content: resposta });
       rosto('contente', 1200);
@@ -1294,15 +1305,16 @@ async function sendMessage() {
     typingEl.remove();
 
     if (!res.ok) {
-      history.pop();
       const motivo = (data && data.error && data.error.message) ? data.error.message : ('código ' + res.status);
-      appendMessage('ai', 'A Bebi encontrou um problema: ' + motivo);
+      const erro = new Error('A Bebi encontrou um problema: ' + motivo);
+      erro.doModelo = true;
+      throw erro;
     } else {
       const bruto = data.reply || 'Não consegui processar sua pergunta. Tente novamente.';
       const separado = separarAprendizado(bruto);
-      const reply = separado.texto || bruto;
+      const reply = separado.texto || 'Não veio resposta. Tente de novo.';
 
-      const aprendidos = separado.fatos.filter(aprender);
+      const aprendidos = aprenderFatos(separado.fatos);
 
       history.push({ role: 'assistant', content: reply });
       rosto('contente', 1200);
@@ -1322,11 +1334,11 @@ async function sendMessage() {
       input.value = texto;
       autoResize(input);
     }
-    // As imagens que não chegaram a ser enviadas voltam para a bandeja.
-    if (imagem && !anexos.some(function (a) { return a.nome === imagem.nome; })) {
-      anexos.unshift(imagem);
-      renderizarAnexos();
-    }
+    // Os anexos voltam para a bandeja para uma nova tentativa.
+    prontos.slice().reverse().forEach(function (anexo) {
+      if (!anexos.includes(anexo)) anexos.unshift(anexo);
+    });
+    renderizarAnexos();
 
     appendMessage('ai', (e && (e.deTransporte || e.doModelo) && e.message)
       ? e.message
@@ -1504,7 +1516,7 @@ async function extrairConteudo(file) {
 async function lerPdf(file) {
   await carregarBiblioteca('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pdf = await pdfjsLib.getDocument({ isEvalSupported: false, data: await file.arrayBuffer() }).promise;
 
   let texto = '';
   const paginas = Math.min(pdf.numPages, 80);
@@ -2755,15 +2767,10 @@ function textoParaFala(texto) {
 // ── Carinha da IA ─────────────────────────────────────────────────────────
 // Um rostinho em SVG que reage ao que está acontecendo: pensa enquanto a
 // resposta vem, fala junto com a voz, e escuta quando o microfone está ligado.
-const SVG_ROSTINHO =
-  '<svg class="rosto" viewBox="0 0 100 100" aria-hidden="true">' +
-  '<g class="olho"><ellipse cx="34" cy="42" rx="9" ry="11"/>' +
-  '<circle class="pupila" cx="34" cy="43" r="4.5"/></g>' +
-  '<g class="olho"><ellipse cx="66" cy="42" rx="9" ry="11"/>' +
-  '<circle class="pupila" cx="66" cy="43" r="4.5"/></g>' +
-  '<path class="boca" d="M34 64 Q50 78 66 64"/></svg>';
+const SVG_ROSTINHO = document.querySelector('#rosto-ia svg').outerHTML;
+document.querySelector('.msg-avatar.ai').innerHTML = SVG_ROSTINHO;
 
-const ESTADOS_ROSTO = ['pensando', 'falando', 'ouvindo', 'contente'];
+const ESTADOS_ROSTO = ['pensando', 'falando', 'ouvindo', 'respondendo', 'contente'];
 let temporizadorRosto = null;
 
 // estado: null (parado), "pensando", "falando", "ouvindo" ou "contente"
@@ -2780,7 +2787,10 @@ function rosto(estado, duracao) {
 
 // Um agrado: clicar na carinha faz ela sorrir.
 function cutucarRosto() {
-  rosto('contente', 900);
+  const avatar = document.getElementById('rosto-ia');
+  if (!ESTADOS_ROSTO.slice(0, -1).some(function (estado) { return avatar.classList.contains(estado); })) {
+    rosto('contente', 900);
+  }
 }
 
 // ── Imagens: gerar, transformar e tratar ──────────────────────────────────
@@ -3049,7 +3059,9 @@ function carregarMemoria() {
   try {
     const bruto = lerPreferencia(CHAVE_MEMORIA);
     memoria = bruto ? JSON.parse(bruto) : [];
-    if (!Array.isArray(memoria)) memoria = [];
+    memoria = Array.isArray(memoria) ? memoria.filter(function (fato) {
+      return typeof fato === 'string' && fato.length >= 3 && fato.length <= 200;
+    }).slice(-LIMITE_MEMORIA) : [];
   } catch (e) { memoria = []; }
   atualizarContadorMemoria();
 }
@@ -3071,8 +3083,13 @@ function aprender(fato) {
   }
   memoria.push(limpo);
   while (memoria.length > LIMITE_MEMORIA) memoria.shift();
-  salvarMemoria();
   return true;
+}
+
+function aprenderFatos(fatos) {
+  const novos = fatos.filter(aprender);
+  if (novos.length) salvarMemoria();
+  return novos;
 }
 
 function esquecer(indice) {
@@ -3618,7 +3635,7 @@ async function plantaEmTresDimensoes(base64, arquivoOriginal) {
       passo(typingEl, "🔍 ampliando a planta…");
       try {
         await carregarBiblioteca("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
-        const doc = await pdfjsLib.getDocument({ data: await arquivoOriginal.arrayBuffer() }).promise;
+        const doc = await pdfjsLib.getDocument({ isEvalSupported: false, data: await arquivoOriginal.arrayBuffer() }).promise;
         imagem = await renderizarPaginaPdf(doc, 1, 2400);
       } catch (e) { /* sem a ampliação, usa a imagem normal */ }
     }
@@ -3793,7 +3810,7 @@ function salvarConversaAtual() {
   }
   atual.atualizadaEm = Date.now();
   atual.linhas = linhasDaConversa;
-  atual.contexto = history.map(function (m) {
+  atual.contexto = history.slice(-12).map(function (m) {
     return { role: m.role, content: cortarParaGuardar(m.content) };
   });
 
@@ -3811,6 +3828,7 @@ function salvarConversaAtual() {
 }
 
 function novaConversa() {
+  if (document.getElementById('send-btn').disabled) return;
   pararFala();
   history.length = 0;
   linhasDaConversa = [];
@@ -3821,6 +3839,7 @@ function novaConversa() {
 }
 
 function abrirConversa(id) {
+  if (document.getElementById('send-btn').disabled) return;
   let alvo = null;
   for (let i = 0; i < conversas.length; i++) {
     if (conversas[i].id === id) { alvo = conversas[i]; break; }
@@ -3830,7 +3849,7 @@ function abrirConversa(id) {
   pararFala();
   idAtual = alvo.id;
   history.length = 0;
-  (alvo.contexto || []).forEach(function (m) {
+  (alvo.contexto || []).slice(-12).forEach(function (m) {
     history.push({ role: m.role, content: m.content });
   });
 
@@ -3878,6 +3897,7 @@ function renomearConversa(id) {
 }
 
 function apagarConversa(id) {
+  if (id === idAtual && document.getElementById('send-btn').disabled) return;
   const c = acharConversa(id);
   if (!c) return;
   if (!confirm('Apagar a conversa "' + (c.titulo || '') + '"? Isto não tem volta.')) return;
@@ -4020,9 +4040,11 @@ async function enviarAoServidor(corpo, tentativa) {
     if (!expirou && !tentativa) {
       mostrarStatusVoz('⚠️ conexão falhou, tentando de novo…');
       await new Promise(function (ok) { setTimeout(ok, 1200); });
-      const r = await enviarAoServidor(corpo, 1);
-      mostrarStatusVoz('');
-      return r;
+      try {
+        return await enviarAoServidor(corpo, 1);
+      } finally {
+        mostrarStatusVoz('');
+      }
     }
     const erro = new Error(expirou
       ? 'A resposta demorou mais de 55 segundos. Pode ser a rede ou uma pergunta muito pesada — tente de novo, ou faça uma pergunta mais curta.'
@@ -4086,38 +4108,63 @@ async function lerEmFluxo(res, typingEl) {
   let fontes = [];
   let bolha = null;
 
-  while (true) {
-    const pedaco = await leitor.read();
-    if (pedaco.done) break;
-    sobra += decodificador.decode(pedaco.value, { stream: true });
+  let terminou = false;
+  let relogio;
+  try {
+    while (!terminou) {
+      let pedaco;
+      try {
+        pedaco = await Promise.race([
+          leitor.read(),
+          new Promise(function (_, rejeitar) {
+            relogio = setTimeout(function () { rejeitar(new Error('A resposta parou de chegar. Tente novamente.')); }, PRAZO_RESPOSTA);
+          }),
+        ]);
+      } finally {
+        clearTimeout(relogio);
+      }
+      sobra += pedaco.done ? decodificador.decode() + '\n'
+        : decodificador.decode(pedaco.value, { stream: true });
+      const linhas = sobra.split('\n');
+      sobra = linhas.pop();
+      let mudou = false;
 
-    const linhas = sobra.split('\n');
-    sobra = linhas.pop();
-    for (const linha of linhas) {
-      if (!linha.trim()) continue;
-      let dado;
-      try { dado = JSON.parse(linha); } catch (e) { continue; }
-
-      if (dado.tipo === 'fontes') {
-        fontes = dado.fontes || [];
-      } else if (dado.tipo === 'texto') {
+      for (const linha of linhas) {
+        if (!linha.trim()) continue;
+        const dado = JSON.parse(linha);
+        if (dado.tipo === 'fontes') {
+          fontes = Array.isArray(dado.fontes) ? dado.fontes : [];
+        } else if (dado.tipo === 'texto' && typeof dado.t === 'string') {
+          texto += dado.t;
+          mudou = true;
+        } else if (dado.tipo === 'erro') {
+          throw new Error(dado.mensagem || 'A Bebi encontrou um problema.');
+        } else if (dado.tipo === 'fim') {
+          terminou = true;
+          break;
+        }
+      }
+      if (mudou) {
         if (!bolha) {
-          if (typingEl) typingEl.remove();
-          rosto(null);
+          typingEl?.remove();
+          rosto('respondendo');
           bolha = criarBalaoDaIA();
         }
-        texto += dado.t;
-        // Enquanto escreve, mostra texto simples: rápido e sem piscar.
         bolha.textContent = separarAprendizado(texto).texto;
         msgs.scrollTop = msgs.scrollHeight;
-      } else if (dado.tipo === 'erro') {
-        const erro = new Error(dado.mensagem);
-        erro.doModelo = true;
-        throw erro;
       }
+      if (pedaco.done) break;
     }
+    if (!terminou || !texto.trim()) throw new Error('A resposta chegou incompleta. Tente novamente.');
+    return { texto, fontes, bolha };
+  } catch (e) {
+    bolha?.parentElement.remove();
+    e.doModelo = true;
+    throw e;
+  } finally {
+    void leitor.cancel().catch(function () {});
+    leitor.releaseLock();
   }
-  return { texto: texto, fontes: fontes, bolha: bolha };
 }
 </script>
 </body>

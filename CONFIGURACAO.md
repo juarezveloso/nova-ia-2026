@@ -98,7 +98,7 @@ Observações:
   ficar indisponível, o Worker cai sozinho no reserva `@cf/llava-hf/llava-1.5-7b-hf`,
   que não exige licença — o chat nunca para por causa disso.
 - **Reaceitar a licença** (se trocar de conta Cloudflare): abra
-  `https://nova-ia-2026.juarez-veloso.workers.dev/aceitar-licenca` e clique no botão.
+  `https://nova-ia-2026.juarez-veloso.workers.dev/aceitar-licenca` configure o segredo de Worker `CHAVE_LICENCA` com uma chave administrativa forte e confirme pelo formulário.
 
 ## Falar em vez de digitar
 
@@ -561,3 +561,14 @@ planta. Girar para baixo continua liberado para quem quiser a vista rasante.
   resultado sai mais retangular que o original.
 - Foto **torta ou escura**: use os botoes de tratamento de imagem (girar,
   contraste, P&B) antes de pedir o 3D.
+
+
+### Leitura de links e validação local
+
+A leitura de páginas pelo Worker é limitada a domínios HTTPS conhecidos. Para incluir
+outras fontes, configure a variável `DOMINIOS_LEITURA` no Worker com os nomes exatos
+dos hosts separados por vírgula. Cada destino de redirecionamento também é validado.
+Só inclua domínios públicos em que você confia.
+
+Execute `node --test` na raiz com Node.js 22 ou mais recente. Os testes usam respostas
+simuladas para o Workers AI e fontes externas, sem consumir a cota de produção.
