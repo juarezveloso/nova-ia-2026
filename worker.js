@@ -1000,10 +1000,8 @@ async function buscarAgendaNasa(ano) {
     const titulo = limparTags(tituloHTML[1]);
     if (!/NASA|Artemis|SpaceX (Crew|CRS)|Starliner|Cygnus|CLPS/i.test(titulo)) continue;
 
-    const dataHTML = bloco.match(/<span class="hds-event-date"[^>]*>[\s\S]*?<\/span><span class="hds-event-time"/i);
-    const data = dataHTML
-      ? limparTags(dataHTML[0].replace(/<span class="hds-event-time"[^>]*>[\s\S]*$/, ''))
-      : String(ano);
+    const dataHTML = bloco.match(/<span class="hds-event-date"[^>]*>([\s\S]*?)<\/span><span class="hds-event-time"/i);
+    const data = dataHTML ? limparTags(dataHTML[1]) : String(ano);
     const link = /^https?:\/\//i.test(encontro[1])
       ? encontro[1]
       : 'https://www.nasa.gov' + encontro[1];
@@ -1120,9 +1118,9 @@ function montarFluxo(fluxoIA, fontes) {
             if (!dados || dados === '[DONE]') continue;
             try {
               const j = JSON.parse(dados);
-              if (j.response) {
+              if (typeof j.response === 'string' || typeof j.response === 'number') {
                 controlador.enqueue(codificar.encode(
-                  JSON.stringify({ tipo: 'texto', t: j.response }) + '\n'));
+                  JSON.stringify({ tipo: 'texto', t: String(j.response) }) + '\n'));
               }
             } catch (e) { /* pedaço incompleto: ignora */ }
           }
