@@ -997,6 +997,8 @@ async function buscarAgendaNasa(ano) {
     const dataISO = bloco.match(/data-event-start-date="(\d{4})-/);
     const tituloHTML = bloco.match(/<h3 class="hds-event-title[^>]*>([\s\S]*?)<\/h3>/i);
     if (!dataISO || dataISO[1] !== String(ano) || !tituloHTML) continue;
+    const titulo = limparTags(tituloHTML[1]);
+    if (!/NASA|Artemis|SpaceX (Crew|CRS)|Starliner|Cygnus|CLPS/i.test(titulo)) continue;
 
     const dataHTML = bloco.match(/<span class="hds-event-date"[^>]*>[\s\S]*?<\/span><span class="hds-event-time"/i);
     const data = dataHTML
@@ -1007,7 +1009,7 @@ async function buscarAgendaNasa(ano) {
       : 'https://www.nasa.gov' + encontro[1];
 
     itens.push({
-      titulo: limparTags(tituloHTML[1]),
+      titulo: titulo,
       data: data,
       url: link,
     });
