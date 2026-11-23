@@ -96,6 +96,24 @@ export default {
 
     const historico = Array.isArray(body.messages) ? body.messages : [];
     const sistema = typeof body.system === 'string' ? body.system : '';
+    const ultimaPergunta = historico.slice().reverse().find(function (m) {
+      return m && m.role === 'user' && typeof m.content === 'string';
+    });
+    if (ultimaPergunta && /\\b(que horas (s[aã]o|é)|qual (?:é )?a hora|data e hora (?:de )?agora|data (?:de )?hoje|dia de hoje)\\b/i.test(ultimaPergunta.content)) {
+      const linha = JSON.stringify({ tipo: 'fontes', fontes: [] }) + '\\n' +
+        JSON.stringify({ tipo: 'texto', t: 'Agora são ' + agoraNoBrasil() + '.' }) + '\\n' +
+        JSON.stringify({ tipo: 'fim' }) + '\\n';
+      if (body.fluxo) {
+        return new Response(linha, {
+          status: 200,
+          headers: Object.assign({}, CORS, {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-store',
+          }),
+        });
+      }
+      return jsonResponse({ reply: 'Agora são ' + agoraNoBrasil() + '.', fontes: [] }, 200);
+    }
 
     // ── Caminho 0: planta baixa → lista de cômodos para montar em 3D ─────────
     if (typeof body.planta === 'string' && body.planta) {
