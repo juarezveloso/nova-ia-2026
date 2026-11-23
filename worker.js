@@ -979,14 +979,72 @@ async function lerPagina(endereco) {
   };
 }
 
+// Agenda oficial de lançamentos da NASA. As datas marcadas como NET podem mudar.
+async function buscarAgendaNasa(ano) {
+  const url = 'https://www.nasa.gov/events/';
+  const resposta = await comPrazo(fetch(url, {
+    headers: { 'User-Agent': 'NovaIA2026/1.0' },
+  }), PRAZO_BUSCA);
+  if (!resposta.ok) throw new Error('NASA Events HTTP ' + resposta.status);
+
+  const html = await resposta.text();
+  const regex = /<li><a href="([^"]+)" class="hds-event-item"[^>]*>([\\s\\S]*?)(?=<li><a href="[^"]+" class="hds-event-item"|<\\/ul>)/gi;
+  const itens = [];
+  let encontro;
+
+  while ((encontro = regex.exec(html)) !== null) {
+    const bloco = encontro[2];
+    const dataISO = bloco.match(/data-event-start-date="(\\d{4})-/);
+    const tituloHTML = bloco.match(/<h3 class="hds-event-title[^>]*>([\\s\\S]*?)<\\/h3>/i);
+    if (!dataISO || dataISO[1] !== String(ano) || !tituloHTML) continue;
+
+    const dataHTML = bloco.match(/<span class="hds-event-date"[^>]*>[\\s\\S]*?<\\/span><span class="hds-event-time"/i);
+    const data = dataHTML
+      ? limparTags(dataHTML[0].replace(/<span class="hds-event-time"[^>]*>[\\s\\S]*$/, ''))
+      : String(ano);
+    const link = /^https?:\\/\\//i.test(encontro[1])
+      ? encontro[1]
+      : 'https://www.nasa.gov' + encontro[1];
+
+    itens.push({
+      titulo: limparTags(tituloHTML[1]),
+      data: data,
+      url: link,
+    });
+  }
+  return itens;
+}
+
 // Consulta as fontes em paralelo e monta um bloco de contexto
 async function pesquisar(termos) {
   const fontes = [];
   const partes = [];
+  const consultaNasa = /nasa/i.test(termos) && /miss(?:[ãa]o|[õo]es)|lan[çc]amento|artemis|astronauta/i.test(termos);
+  const anoNasa = /\\b2026\\b|\\b226\\b/.test(termos) ? 2026 : new Date().getFullYear();
   const anoCorrigido = /nasa|miss(?:[ãa]o|[õo]es)/i.test(termos) && /\b226\b/.test(termos);
   if (anoCorrigido) {
     termos = termos.replace(/\b226\b/g, '2026');
     partes.push('Correção de contexto: interprete “226” como “2026” na pergunta sobre missões da NASA.');
+  }
+
+  if (consultaNasa) {
+    try {
+      const eventos = await buscarAgendaNasa(anoNasa);
+      if (eventos.length) {
+        partes.push('AGENDA OFICIAL DE LANÇAMENTOS DA NASA PARA ' + anoNasa + ':\\n' +
+          eventos.map(function (evento) {
+            return '- ' + evento.data + ': ' + evento.titulo + ' — ' + evento.url;
+          }).join('\\n') +
+          '\\nAs datas NET significam “não antes de” e podem mudar. Esta agenda lista próximos lançamentos, não todas as missões já realizadas no ano.');
+      } else {
+        partes.push('A agenda oficial da NASA não retornou lançamentos para ' + anoNasa + '. Não invente uma lista.');
+      }
+      fontes.push({ titulo: 'Agenda de eventos e lançamentos da NASA', url: 'https://www.nasa.gov/events/' });
+    } catch (e) {
+      partes.push('Não foi possível carregar a agenda oficial da NASA agora. Informe esse erro e mostre o link https://www.nasa.gov/events/.');
+      fontes.push({ titulo: 'Agenda de eventos e lançamentos da NASA', url: 'https://www.nasa.gov/events/' });
+    }
+    return { texto: partes.join('\\n\\n'), fontes: fontes };
   }
 
   const querCotacao = /ptax|d[óo]lar|dolar|euro|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|usd|brl/i.test(termos);
