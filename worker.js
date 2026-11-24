@@ -205,7 +205,7 @@ export default {
     // Perguntas claramente dependentes de dado atual disparam a pesquisa sozinhas.
     // Antes dependíamos só do modelo escrever BUSCAR, e ele nem sempre escrevia —
     // foi assim que "qual a PTAX de hoje?" passou sem consultar cotação nenhuma.
-    const PADRAO_ATUAL = /\b(?:ptax|d[óo]lar|dolar|euro|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|selic|ipca|incc|infla[çc][ãa]o|juros|ibovespa|b[óo]lsa|not[íi]cias?|[úu]ltimas|hoje|agora|atua(?:l|is)|recentes?|pre[çc]os?|quanto (est[áa]|custa)|o que (aconteceu|houve)|nasa|miss(?:[ãa]o|[õo]es)|lan[çc]amentos?|expedi[çc][ãa]o espacial|20\d{2})\b/i;
+    const PADRAO_ATUAL = /\b(?:ptax|d[óo]lar|dolar|euros?|eur|usd|btc|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|selic|ipca|incc|infla[çc][ãa]o|juros|ibovespa|b[óo]lsa|not[íi]cias?|[úu]ltimas|hoje|agora|atua(?:l|is)|recentes?|pre[çc]os?|quanto (est[áa]|custa)|o que (aconteceu|houve)|nasa|miss(?:[ãa]o|[õo]es)|lan[çc]amentos?|expedi[çc][ãa]o espacial|20\d{2})\b/i;
 
     const perguntaOriginal = alvo.content;
     async function acrescentarPesquisa(termos) {
@@ -217,8 +217,9 @@ export default {
         : 'A pesquisa não confirmou dados atuais. Explique essa limitação ao responder.');
     }
 
-    const jaPesquisou = podePesquisar && !enderecos.length && PADRAO_ATUAL.test(perguntaOriginal);
-    if (jaPesquisou) await acrescentarPesquisa(perguntaOriginal.slice(0, 200));
+    const consulta = resolverConsulta(perguntaOriginal, recentes);
+    const jaPesquisou = podePesquisar && !enderecos.length && PADRAO_ATUAL.test(consulta);
+    if (jaPesquisou) await acrescentarPesquisa(consulta.slice(0, 200));
 
     // Modo fluxo: a resposta sai em pedaços, conforme o modelo escreve.
     // Uma resposta longa levava 25s de espera em silêncio — tempo suficiente
@@ -921,42 +922,52 @@ async function cotacaoBancoCentral() {
       Number(c.cotacaoCompra).toFixed(4) + ' / venda',
     valor: Number(c.cotacaoVenda).toFixed(4),
     quando: String(c.dataHoraCotacao).slice(0, 19),
+    fonte: FONTES_COTACAO.ptax,
   };
 }
 
-// Dólar e euro por fontes internacionais (reserva)
-async function cotacaoInternacional() {
+const FONTES_COTACAO = {
+  ptax: { titulo: 'PTAX do Banco Central', url: 'https://www.bcb.gov.br/estabilidadefinanceira/historicocotacoes' },
+  frankfurter: { titulo: 'Frankfurter — taxas de referência', url: 'https://frankfurter.dev/' },
+  exchange: { titulo: 'ExchangeRate-API — taxas de referência', url: 'https://www.exchangerate-api.com/' },
+  bitcoin: { titulo: 'CoinGecko — Bitcoin', url: 'https://www.coingecko.com/pt/moedas/bitcoin' },
+};
+
+function assuntosFinanceiros(texto) {
+  const semAcentos = semAcento(texto);
+  return [...new Set(semAcentos.match(/\b(?:ptax|dolar|euro|bitcoin|btc|selic|ipca|incc)\b/g) || [])];
+}
+
+function resolverConsulta(pergunta, recentes) {
+  // Só complementa retomadas explícitas. Uma pergunta nova conserva o próprio assunto.
+  const curta = semAcento(pergunta).replace(/[?!.]+$/, '').trim();
+  if (!/^(?:e (?:agora|hoje|o valor|a cotacao)|quanto (?:esta|vale)(?: hoje| agora)?|qual (?:e )?o valor(?: de hoje)?|qual (?:e )?a cotacao(?: de hoje)?)$/.test(curta)) return pergunta;
+  const anterior = recentes.slice(0, -1).findLast(function (m) { return m.role === 'user'; });
+  const assuntos = assuntosFinanceiros(anterior?.content || '');
+  return assuntos.length === 1 ? pergunta + ' — ' + assuntos[0] + ' hoje' : '';
+}
+
+async function cotacaoInternacional(moeda) {
   const signal = AbortSignal.timeout(PRAZO_BUSCA);
+  const nome = moeda === 'EUR' ? 'Euro' : 'Dólar americano';
   try {
-    const d = await pegarJson('https://api.frankfurter.app/latest?from=USD&to=BRL,EUR', AbortSignal.any([signal, AbortSignal.timeout(2500)]));
-    const saida = [];
-    if (d.rates && d.rates.BRL) {
-      saida.push({ nome: 'Dólar americano', valor: Number(d.rates.BRL).toFixed(4), quando: d.date });
-    }
-    if (d.rates && d.rates.BRL && d.rates.EUR) {
-      saida.push({
-        nome: 'Euro',
-        valor: (Number(d.rates.BRL) / Number(d.rates.EUR)).toFixed(4),
-        quando: d.date,
-      });
-    }
-    if (saida.length) return saida;
-    throw new Error('sem taxas');
+    const d = await pegarJson('https://api.frankfurter.app/latest?from=' + moeda + '&to=BRL',
+      AbortSignal.any([signal, AbortSignal.timeout(2500)]));
+    const valor = Number(d.rates?.BRL);
+    if (!Number.isFinite(valor) || valor <= 0) throw new Error('sem taxa BRL');
+    return { nome, valor: valor.toFixed(4), quando: d.date || 'data não informada', fonte: FONTES_COTACAO.frankfurter };
   } catch (e) {
-    const d = await pegarJson('https://open.er-api.com/v6/latest/USD', signal);
-    if (!d.rates || !d.rates.BRL) throw new Error('sem taxas');
-    return [{
-      nome: 'Dólar americano',
-      valor: Number(d.rates.BRL).toFixed(4),
-      quando: d.time_last_update_utc || '',
-    }];
+    const d = await pegarJson('https://open.er-api.com/v6/latest/' + moeda, signal);
+    const valor = Number(d.rates?.BRL);
+    if (!Number.isFinite(valor) || valor <= 0) throw new Error('sem taxa BRL');
+    return { nome, valor: valor.toFixed(4), quando: d.time_last_update_utc || 'data não informada', fonte: FONTES_COTACAO.exchange };
   }
 }
 
 async function cotacaoBitcoin() {
   const d = await pegarJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl&include_last_updated_at=true');
   if (!d.bitcoin || !d.bitcoin.brl) throw new Error('sem bitcoin');
-  return { nome: 'Bitcoin', valor: Number(d.bitcoin.brl).toLocaleString('pt-BR'), quando: d.bitcoin.last_updated_at ? new Date(d.bitcoin.last_updated_at * 1000).toISOString() : 'data não informada' };
+  return { nome: 'Bitcoin', fonte: FONTES_COTACAO.bitcoin, valor: Number(d.bitcoin.brl).toLocaleString('pt-BR'), quando: d.bitcoin.last_updated_at ? new Date(d.bitcoin.last_updated_at * 1000).toISOString() : 'data não informada' };
 }
 
 // Indicadores econômicos oficiais (séries do Banco Central)
@@ -983,19 +994,20 @@ async function buscarIndicadores(termos) {
 }
 
 async function buscarCotacoes(termos) {
-  const querBitcoin = /bitcoin|btc|cripto/i.test(termos || '');
-  const r = await Promise.all([
-    cotacaoBancoCentral().catch(function () { return null; }),
-    cotacaoInternacional().catch(function () { return null; }),
-    querBitcoin ? cotacaoBitcoin().catch(function () { return null; })
-                : Promise.resolve(null),
-  ]);
-  const lista = [];
-  if (r[0]) lista.push(r[0]);
-  if (r[1]) r[1].forEach(function (c) { lista.push(c); });
-  if (r[2]) lista.push(r[2]);
-  if (!lista.length) throw new Error('nenhuma fonte de cotação respondeu');
-  return lista;
+  const consulta = semAcento(termos);
+  const querPtax = /\bptax\b/.test(consulta);
+  const querDolar = /\b(?:dolar|dolares|usd)\b/.test(consulta);
+  const querEuro = /\b(?:euros?|eur)\b/.test(consulta);
+  const querBitcoin = /\b(?:bitcoin|btc|cripto)\b/.test(consulta);
+  const generica = !querPtax && !querDolar && !querEuro && !querBitcoin;
+  const tarefas = [];
+  if (querPtax || querDolar || generica) tarefas.push(cotacaoBancoCentral());
+  if (querDolar || generica) tarefas.push(cotacaoInternacional('USD'));
+  if (querEuro || generica) tarefas.push(cotacaoInternacional('EUR'));
+  if (querBitcoin) tarefas.push(cotacaoBitcoin());
+  const resultados = await Promise.allSettled(tarefas);
+  return resultados.filter(function (r) { return r.status === 'fulfilled'; })
+    .map(function (r) { return r.value; });
 }
 // Lê uma página da web e devolve o texto principal
 async function lerPagina(endereco, env) {
@@ -1092,7 +1104,7 @@ async function pesquisar(termos) {
     return { texto: partes.join('\n\n'), fontes: fontes };
   }
 
-  const querCotacao = /ptax|d[óo]lar|dolar|euro|c[âa]mbio|cota[çc][ãa]o|moeda|bitcoin|cripto|usd|brl/i.test(termos);
+  const querCotacao = /\b(?:ptax|d[óo]lar(?:es)?|euros?|eur|c[âa]mbio|cota[çc][ãa]o|moedas?|bitcoin|btc|cripto|usd|brl)\b/i.test(termos);
   const querIndicador = /selic|ipca|incc|infla[çc][ãa]o|juros|[íi]ndice|economia|custo da constru/i.test(termos);
   const resultados = await Promise.all([
     (!querCotacao && !querIndicador || /not[íi]cia|manchete/i.test(termos))
@@ -1112,10 +1124,10 @@ async function pesquisar(termos) {
     partes.push('COTAÇÕES MAIS RECENTES DAS FONTES:\n' + moedas.map(function (c) {
       return '- ' + c.nome + ': R$ ' + c.valor + ' (medido em ' + c.quando + ')';
     }).join('\n'));
-    partes.push('Observação: a PTAX de fechamento é divulgada pelo Banco Central por volta ' +
-      'das 13h em dias úteis. Antes disso, a PTAX mais recente é a do dia útil anterior — ' +
-      'diga isso ao usuário em vez de apresentá-la como sendo de hoje.');
-    fontes.push({ titulo: 'Cotações e PTAX (Banco Central)', url: 'https://www.bcb.gov.br/estabilidadefinanceira/historicocotacoes' });
+    if (moedas.some(function (c) { return c.fonte === FONTES_COTACAO.ptax; })) {
+      partes.push('A PTAX disponível pode ser do último dia útil. Use a data de referência da publicação.');
+    }
+    fontes.push(...new Set(moedas.map(function (c) { return c.fonte; })));
   }
   if (indicadores && indicadores.length) {
     partes.push('INDICADORES OFICIAIS (Banco Central):\n' + indicadores.map(function (i) {

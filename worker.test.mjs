@@ -160,3 +160,49 @@ test('modo código não consulta links nem segue pedidos BUSCAR do modelo', asyn
   assert.equal(resposta.status, 200);
   assert.equal(rede.mock.callCount(), 0);
 });
+
+test('retoma o assunto econômico anterior em perguntas curtas', async (t) => {
+  const rede = t.mock.method(globalThis, 'fetch', async (endereco) => {
+    assert.match(String(endereco), /sgs\.432\//);
+    return Response.json([{ valor: '12.25', data: '19/11/2026' }]);
+  });
+  const r = await chamar({ messages: [
+    mensagem('O que é Selic?'), { role: 'assistant', content: 'É a taxa básica.' }, mensagem('E hoje?'),
+  ] }, async (_, dados) => {
+    assert.match(dados.messages.at(-1).content, /12\.25%/);
+    assert.match(dados.messages.at(-1).content, /19\/11\/2026/);
+    return { response: '12,25%' };
+  });
+  assert.equal(r.status, 200);
+  assert.equal(rede.mock.callCount(), 1);
+});
+
+test('usa a moeda explicitamente pedida e cita o provedor que respondeu', async (t) => {
+  const chamadas = [];
+  t.mock.method(globalThis, 'fetch', async (endereco) => {
+    chamadas.push(String(endereco));
+    if (String(endereco).includes('frankfurter')) return new Response('', { status: 503 });
+    assert.match(String(endereco), /latest\/EUR$/);
+    return Response.json({ rates: { BRL: 6.32 }, time_last_update_utc: '24/11/2026' });
+  });
+  const r = await chamar({ messages: [mensagem('Qual é a PTAX de hoje?'), mensagem('E o euro?')] },
+    async (_, dados) => {
+      assert.match(dados.messages.at(-1).content, /Euro: R\$ 6\.3200/);
+      assert.doesNotMatch(dados.messages.at(-1).content, /Dólar|Banco Central/);
+      return { response: 'R$ 6,32' };
+    });
+  assert.equal(r.status, 200);
+  assert.equal(chamadas.length, 2);
+  assert.match((await r.json()).fontes[0].titulo, /ExchangeRate-API/);
+});
+
+test('uma retomada ambígua não dispara pesquisa automática', async (t) => {
+  const rede = t.mock.method(globalThis, 'fetch', () => assert.fail('busca sem assunto'));
+  const r = await chamar({ messages: [mensagem('Compare euro e Selic.'), mensagem('E agora?')] },
+    async (_, dados) => {
+      assert.equal(dados.messages.at(-1).content, 'E agora?');
+      return { response: 'Você quer saber do euro ou da Selic?' };
+    });
+  assert.equal(r.status, 200);
+  assert.equal(rede.mock.callCount(), 0);
+});

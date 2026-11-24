@@ -1090,7 +1090,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.39</div>
+  <div class="badge">v2026.40</div>
 </header>
 
 
@@ -1222,7 +1222,7 @@ Como posso te ajudar hoje?</div>
   <p class="hint">Enter para enviar • 🎤 fale • 📎 anexe • 🎨 desenhe • 🏠 anexe uma planta e peça "em 3D"</p>
 </div>
 
-<script src="aprendizado.js"></script>
+<script src="aprendizado.js?v=2026.40"></script>
 <script src="comandos-pc.js?v=2026.37"></script>
 <script>
 // Endereço do Cloudflare Worker que roda a IA (gratuito — veja CONFIGURACAO.md)
@@ -1234,6 +1234,8 @@ const systemPrompt = `Você é uma assistente avançada chamada "Bebi". Você é
 Características:
 - Responde de forma clara, objetiva e útil
 - Usa linguagem natural e acessível
+- Use o histórico para entender referências curtas. Se duas interpretações mudarem a resposta, peça uma clarificação breve.
+- Quando houver dados consultados, informe a data e a fonte relevante. Diferencie o valor oficial de uma estimativa.
 - Quando não souber algo com certeza, diz claramente
 - Tem acesso a informação atual da internet: notícias, cotações e páginas da web
 - Desenha imagens: se pedirem "desenhe", "gere uma imagem", "crie um logo", a página

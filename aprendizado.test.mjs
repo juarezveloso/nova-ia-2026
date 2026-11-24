@@ -41,3 +41,13 @@ test('um milhão de casos gerados para seleção e correção de exemplos', () =
     assert.equal(corrigidos[0].resposta, 'Resposta corrigida ' + i);
   }
 });
+
+test('recupera exemplos com plural sem misturar identificadores', () => {
+  const exemplos = [
+    { pergunta: 'Inspeção do equipamento 12', resposta: 'Checklist 12' },
+    { pergunta: 'Inspeção do equipamento 15', resposta: 'Checklist 15' },
+  ];
+  const resultados = selecionar(exemplos, 'Inspeções dos equipamentos 12');
+  assert.equal(resultados.length, 1);
+  assert.equal(resultados[0].resposta, 'Checklist 12');
+});

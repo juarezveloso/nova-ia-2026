@@ -23,7 +23,11 @@ const aprendizadoBebi = (() => {
   }
 
   function termos(texto) {
-    return new Set(texto.split(' ').filter((palavra) => palavra.length >= 3 && !ignoradas.has(palavra)));
+    return new Set(texto.split(' ').filter((palavra) => palavra.length >= 3 && !ignoradas.has(palavra))
+      .map((palavra) => {
+        if (palavra.endsWith('coes')) return palavra.slice(0, -4) + 'cao';
+        return /^[a-z]{3,}[aeiou]s$/.test(palavra) ? palavra.slice(0, -1) : palavra;
+      }));
   }
 
   function selecionar(exemplos, consulta) {
@@ -31,10 +35,14 @@ const aprendizadoBebi = (() => {
     const procurados = termos(chave);
     if (!chave) return [];
 
+    const numerosConsulta = chave.match(/\b\d+\b/g) || [];
     return exemplos.map((exemplo, i) => {
       const candidato = normalizar(exemplo.pergunta);
       if (candidato === chave) return { exemplo, nota: 2, i };
 
+      const numerosExemplo = candidato.match(/\b\d+\b/g) || [];
+      if (numerosConsulta.length && numerosExemplo.length &&
+          !numerosConsulta.some((numero) => numerosExemplo.includes(numero))) return { exemplo, nota: 0, i };
       const palavras = termos(candidato);
       let comuns = 0;
       for (const termo of procurados) if (palavras.has(termo)) comuns++;
