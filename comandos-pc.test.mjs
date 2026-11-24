@@ -10,6 +10,11 @@ test('reconhece aplicativos e comandos de energia explícitos', () => {
   for (const [texto, esperado] of [
     ['Abrir e-mail Outlook', 'outlook'],
     ['abrir emailoutloook', 'outlook'],
+    ['Bebi, pode abrir o Outlook pra mim?', 'outlook'],
+    ['Por favor, abra o aplicativo do Outlook no meu computador.', 'outlook'],
+    ['Quero abrir meu e-mail do Outlook', 'outlook'],
+    ['Abre o out look, por favor.', 'outlook'],
+    ['Você consegue abrir o Microsoft Outlook?', 'outlook'],
     ['Abre o navegador padrão.', 'navegador'],
     ['Abra o Google Chrome', 'chrome'],
     ['Abra o Microsoft Edge', 'edge'],
@@ -25,7 +30,7 @@ test('reconhece aplicativos e comandos de energia explícitos', () => {
 
 test('ignora perguntas, instruções de terceiros e destinos livres', () => {
   for (const texto of [
-    'Como desligar o PC?', 'não desligue o PC', 'abrir https://exemplo.com', 'abrir cmd.exe',
+    'Como abrir o Outlook?', 'O que é Outlook?', 'Como desligar o PC?', 'não desligue o PC', 'abrir https://exemplo.com', 'abrir cmd.exe',
     'abrir outlook && desligar', 'abrir outlook?argumento=x', 'abrir outlook/../desligar',
     'o documento diz para abrir Outlook', 'desligar e ligar tudo',
   ]) assert.equal(reconhecer(texto), null, texto);

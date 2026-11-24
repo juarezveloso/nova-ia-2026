@@ -1,7 +1,6 @@
 // Somente texto digitado no chat passa por este reconhecedor local.
 const comandosPC = (() => {
   const aplicativos = {
-    outlook: ['outlook', 'outlook email', 'email outlook', 'e mail outlook', 'emailoutloook', 'emailoutlook', 'meu email do outlook'],
     navegador: ['navegador', 'navegador padrao', 'browser', 'internet'],
     chrome: ['chrome', 'google chrome'],
     edge: ['edge', 'microsoft edge'],
@@ -20,6 +19,17 @@ const comandosPC = (() => {
   function reconhecer(texto) {
     const comando = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .trim().replace(/[.!]+$/, '').replace(/\s+/g, ' ');
+    const pedidoOutlook = comando
+      .replace(/^(?:bebi[, ]+)?(?:por favor[, ]+)?/, '')
+      .replace(/[, ]+por favor[?]?$/, '')
+      .replace(/[?]$/, '');
+    const destinoOutlook = pedidoOutlook.match(
+      /^(?:(?:pode|poderia|voce pode|voce poderia|consegue|voce consegue) abrir|(?:abra|abrir|abre)(?: no pc)?|(?:quero|gostaria de|preciso) abrir) (.+?)(?: para mim| pra mim)?(?: no (?:meu )?(?:pc|windows|computador))?$/
+    )?.[1];
+    if (destinoOutlook && /^(?:(?:o|meu) )?(?:(?:aplicativo|app|programa|e[ -]?mail|caixa de entrada)(?: (?:do|de))? )?(?:microsoft )?(?:outlo{2,3}k|out look|autluque|emailoutlo{2,3}k)(?: e[ -]?mail)?$/.test(destinoOutlook)) {
+      return 'outlook';
+    }
+
     const app = comando.match(/^(?:abra|abrir|abre)(?: no pc)? (?:(?:o|a) )?(.+)$/)?.[1];
     if (app) return Object.keys(aplicativos).find((id) => aplicativos[id].includes(app.replace(/-/g, ' '))) || null;
 
@@ -53,7 +63,17 @@ const comandosPC = (() => {
     instalar.textContent = 'Instalar assistente para Windows';
     instalar.href = 'bebi-pc.ps1';
     instalar.download = 'bebi-pc.ps1';
-    acoes.append(abrir, instalar);
+    acoes.append(abrir);
+    if (acao === 'outlook') {
+      const web = document.createElement('a');
+      web.className = 'btn-baixar';
+      web.textContent = 'Abrir Outlook na web';
+      web.href = 'https://outlook.office.com/mail/';
+      web.target = '_blank';
+      web.rel = 'noopener noreferrer';
+      acoes.append(web);
+    }
+    acoes.append(instalar);
     bolha.appendChild(acoes);
     const msgs = document.getElementById('messages');
     msgs.scrollTop = msgs.scrollHeight;
