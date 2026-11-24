@@ -344,6 +344,20 @@
   #attach-btn svg { width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.2s; }
   #attach-btn:hover svg { stroke: var(--accent2); }
 
+  #painel-dispositivos {
+    width: min(480px, calc(100% - 32px)); max-height: 85dvh; margin: auto; padding: 18px;
+    color: var(--text); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: auto;
+  }
+  #painel-dispositivos::backdrop { background: rgba(0,0,0,.72); }
+  .dispositivos-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .dispositivos-topo h2 { font-size: 18px; }
+  .dispositivos-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  #painel-dispositivos p, #painel-dispositivos summary { font-size: 13px; }
+  #dispositivos-status { margin-top: 10px; color: var(--accent2); }
+  #dispositivos-video { width: 100%; max-height: 35vh; background: #000; }
+  #dispositivos-jogos { overflow-wrap: anywhere; }
+
   #attachments {
     display: flex; flex-wrap: wrap; gap: 8px;
     margin-bottom: 10px;
@@ -980,6 +994,7 @@
     <button class="painel-x" onclick="fecharPainel()" title="Fechar">&times;</button>
   </div>
   <button id="nova-conversa" onclick="novaConversa()">+ Nova conversa</button>
+  <button id="abrir-dispositivos" type="button" class="btn-baixar">Periféricos</button>
   <div id="lista-conversas"></div>
   <div class="painel-rodape">Guardadas só neste aparelho — não vão para servidor nenhum.</div>
 </aside>
@@ -1027,7 +1042,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.31</div>
+  <div class="badge">v2026.32</div>
 </header>
 
 
@@ -1079,6 +1094,37 @@ Como posso te ajudar hoje?</div>
 <pre id="log-voz"></pre>
 
 <div id="dropzone">Solte os arquivos aqui para analisar 📄</div>
+
+<dialog id="painel-dispositivos" aria-labelledby="dispositivos-titulo">
+  <div class="dispositivos-topo">
+    <h2 id="dispositivos-titulo">Periféricos</h2>
+    <form method="dialog"><button class="btn-baixar" aria-label="Fechar periféricos">Fechar</button></form>
+  </div>
+  <p>Câmera e tela têm prévia local. Para enviar uma imagem à Bebi, anexe uma captura e envie pelo chat.</p>
+  <div class="dispositivos-acoes">
+    <button type="button" class="btn-baixar" data-captura="camera">Abrir câmera</button>
+    <button type="button" class="btn-baixar" data-captura="tela">Compartilhar tela</button>
+    <button type="button" class="btn-baixar" data-captura="microfone">Testar microfone</button>
+    <button type="button" class="btn-baixar" id="dispositivos-som">Testar som</button>
+    <button type="button" class="btn-baixar" id="dispositivos-parar" disabled>Encerrar captura</button>
+    <button type="button" class="btn-baixar destaque" id="dispositivos-anexar" disabled>Anexar captura</button>
+  </div>
+  <video id="dispositivos-video" autoplay playsinline muted hidden></video>
+  <meter id="dispositivos-nivel" min="0" max="1" value="0" aria-label="Nível do microfone" hidden></meter>
+  <details>
+    <summary>Outros dispositivos</summary>
+    <p>Selecione um dispositivo para identificá-lo. As opções dependem do navegador e do hardware.</p>
+    <div class="dispositivos-acoes">
+      <button type="button" class="btn-baixar" data-dispositivo="usb">USB</button>
+      <button type="button" class="btn-baixar" data-dispositivo="hid">HID</button>
+      <button type="button" class="btn-baixar" data-dispositivo="serial">Serial</button>
+      <button type="button" class="btn-baixar" data-dispositivo="bluetooth">Bluetooth</button>
+      <button type="button" class="btn-baixar" data-dispositivo="midi">MIDI</button>
+      <button type="button" class="btn-baixar" id="dispositivos-controles">Ver controles de jogo</button>
+    </div>
+  </details>
+  <p id="dispositivos-status" role="status"></p>
+</dialog>
 
 <div id="input-area">
   <div id="status-voz"></div>
@@ -4259,5 +4305,6 @@ async function lerEmFluxo(res, typingEl) {
   }
 }
 </script>
+<script src="perifericos.js"></script>
 </body>
 </html>

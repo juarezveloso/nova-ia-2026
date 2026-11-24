@@ -587,3 +587,17 @@ modelo hospedado no Workers AI são administrados pelo provedor.
 
 A suíte `node --test` inclui um milhão de casos gerados determinísticos para
 seleção, atualização e isolamento de exemplos, além dos testes do Worker.
+
+### Periféricos
+
+Abra **Menu → Periféricos** em HTTPS ou localhost. O painel usa a câmera e o
+microfone padrão selecionados pelo navegador. Também oferece compartilhamento
+de tela, teste de áudio na saída padrão e detecção de controles de jogo
+compatíveis. Câmera, tela e microfone são encerrados ao fechar o painel. As
+prévias ficam locais. Para analisar uma imagem, clique em **Anexar captura** e
+envie pelo chat.
+
+Navegadores com suporte podem oferecer seletores de USB, HID, serial, Bluetooth
+e MIDI. A seleção identifica o dispositivo. O painel não abre portas seriais
+nem envia comandos ao hardware. As permissões concedidas podem ser gerenciadas
+nas configurações do site no navegador.
