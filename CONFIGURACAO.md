@@ -601,3 +601,33 @@ Navegadores com suporte podem oferecer seletores de USB, HID, serial, Bluetooth
 e MIDI. A seleção identifica o dispositivo. O painel não abre portas seriais
 nem envia comandos ao hardware. As permissões concedidas podem ser gerenciadas
 nas configurações do site no navegador.
+
+### Comandos no Windows
+
+No Windows 10 ou 11, baixe **Assistente para Windows** pelo painel **Menu →
+Periféricos** ou pelo cartão de comando no chat. Abra o PowerShell na pasta
+em que salvou o arquivo, confira sua origem no repositório e rode:
+
+```powershell
+Unblock-File -LiteralPath .\bebi-pc.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\bebi-pc.ps1
+```
+
+Confirme a instalação. O assistente usa o perfil do usuário atual e registra
+o protocolo local `bebi-pc:`. Depois, digite no chat **abrir Outlook**,
+**abrir Chrome**, **abrir Edge**, **abrir Firefox**, **abrir navegador**,
+**abrir Calculadora**, **abrir Bloco de Notas**, **abrir Downloads**,
+**bloquear o PC**, **reiniciar o PC** ou **desligar o PC**. Clique no cartão,
+autorize a abertura do assistente se o navegador perguntar e confirme no
+Windows. Cada pedido é tratado localmente. O Outlook clássico, quando
+encontrado, abre no computador. O Outlook web atende os outros casos.
+
+Os comandos de energia não forçam o fechamento de aplicativos. Salve os
+arquivos antes de confirmar. Ligar um PC já desligado exige o botão físico
+ou um recurso como Wake-on-LAN acionado de outro dispositivo.
+
+Para desinstalar, execute a cópia baixada com o argumento `-Remover`:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\bebi-pc.ps1 -Remover
+```

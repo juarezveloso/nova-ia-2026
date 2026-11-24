@@ -9,7 +9,7 @@
 // guardadas, anexar e ler documentos (PDF, Word, Excel), gerar planilha, Word e
 // PDF, tratar imagens (girar, P&B, contraste) e a leitura em voz alta.
 
-const CACHE_APP = 'app-bebi-v30';
+const CACHE_APP = 'app-bebi-v31';
 const CACHE_LIBS = 'libs-bebi-v26';
 
 const APP = [
@@ -17,6 +17,8 @@ const APP = [
   './index.html',
   './aprendizado.js',
   './perifericos.js',
+  './comandos-pc.js',
+  './bebi-pc.ps1',
   './manifest.json',
   './icone-192.png',
   './icone-512.png',
