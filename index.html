@@ -1042,7 +1042,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.34</div>
+  <div class="badge">v2026.35</div>
 </header>
 
 
@@ -3903,7 +3903,15 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     // Sem service worker o site continua funcionando normalmente: só perde
     // a parte offline. Por isso a falha é silenciosa.
-    navigator.serviceWorker.register('sw.js').catch(function () {});
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (registro) {
+      function verificarAtualizacao() {
+        if (navigator.onLine && document.visibilityState === 'visible') {
+          registro.update().catch(function () {});
+        }
+      }
+      document.addEventListener('visibilitychange', verificarAtualizacao);
+      window.addEventListener('online', verificarAtualizacao);
+    }).catch(function () {});
   });
 }
 

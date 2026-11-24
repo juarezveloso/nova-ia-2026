@@ -9,7 +9,7 @@
 // guardadas, anexar e ler documentos (PDF, Word, Excel), gerar planilha, Word e
 // PDF, tratar imagens (girar, P&B, contraste) e a leitura em voz alta.
 
-const CACHE_APP = 'app-bebi-v32';
+const CACHE_APP = 'app-bebi-v33';
 const CACHE_LIBS = 'libs-bebi-v26';
 
 const APP = [
@@ -38,7 +38,7 @@ const LIBS = [
 self.addEventListener('install', function (evento) {
   evento.waitUntil(
     caches.open(CACHE_APP)
-      .then(function (c) { return c.addAll(APP); })
+      .then(function (c) { return c.addAll(APP.map(function (url) { return new Request(url, { cache: 'reload' }); })); })
       .then(function () { return self.skipWaiting(); })
   );
 });
@@ -104,7 +104,7 @@ self.addEventListener('fetch', function (evento) {
   evento.respondWith((async function () {
     const cache = await caches.open(CACHE_APP);
     try {
-      const resposta = await fetch(pedido);
+      const resposta = await fetch(pedido, { cache: 'no-cache' });
       if (resposta.ok) {
         await cache.put(arquivo, resposta.clone()).catch(function () {});
         return resposta;
