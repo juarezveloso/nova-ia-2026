@@ -635,3 +635,16 @@ Para desinstalar, execute a cópia baixada com o argumento `-Remover`:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\bebi-pc.ps1 -Remover
 ```
+
+### Projetos, arquivos editáveis e exportação
+
+No menu lateral, abra **Projetos → Novo projeto**. Salve um nome, instruções
+e um texto de referência. Ao selecionar um projeto, o painel mostra suas
+conversas. **Conversas gerais** dá acesso ao histórico anterior e à memória
+geral. As referências e instruções do projeto ativo acompanham os pedidos
+à IA. Os projetos e históricos ficam guardados neste navegador.
+
+Em um cartão de arquivo gerado, abra **Visualizar e editar conteúdo** para
+revisar o texto antes do download. O editor exibe texto simples e as alterações
+valem para o download daquele cartão. No histórico lateral, use o botão de
+exportação de uma conversa para baixá-la em Markdown.
