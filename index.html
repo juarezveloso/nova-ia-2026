@@ -358,6 +358,18 @@
   #dispositivos-video { width: 100%; max-height: 35vh; background: #000; }
   #dispositivos-jogos { overflow-wrap: anywhere; }
 
+  #painel-codigo {
+    width: min(960px, calc(100% - 24px)); max-height: 90dvh; margin: auto; padding: 18px;
+    color: var(--text); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: auto;
+  }
+  #painel-codigo::backdrop { background: rgba(0,0,0,.72); }
+  #painel-codigo input, #painel-codigo select { width: 100%; margin: 6px 0; }
+  #painel-codigo label { display: block; margin: 8px 0 4px; }
+  #painel-codigo .artefato-editor { min-height: 12em; }
+  #codigo-resumo { white-space: pre-wrap; overflow-wrap: anywhere; padding-top: 8px; }
+  #codigo-status { color: var(--accent2); margin: 8px 0; }
+
   #attachments {
     display: flex; flex-wrap: wrap; gap: 8px;
     margin-bottom: 10px;
@@ -1010,6 +1022,7 @@
     <button class="painel-x" onclick="fecharPainel()" title="Fechar">&times;</button>
   </div>
   <button id="nova-conversa" onclick="novaConversa()">+ Nova conversa</button>
+  <button id="abrir-codigo" type="button" class="btn-baixar">Espaço de código</button>
   <button id="abrir-dispositivos" type="button" class="btn-baixar">Periféricos</button>
   <details id="painel-projetos">
     <summary>Projetos</summary>
@@ -1077,7 +1090,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.38</div>
+  <div class="badge">v2026.39</div>
 </header>
 
 
@@ -1129,6 +1142,33 @@ Como posso te ajudar hoje?</div>
 <pre id="log-voz"></pre>
 
 <div id="dropzone">Solte os arquivos aqui para analisar 📄</div>
+
+<dialog id="painel-codigo" aria-labelledby="codigo-titulo">
+  <div class="dispositivos-topo">
+    <h2 id="codigo-titulo">Espaço de código</h2>
+    <form method="dialog"><button class="btn-baixar">Fechar</button></form>
+  </div>
+  <p>Abra até oito arquivos de texto. Ao pedir ajuda, os arquivos selecionados entram no contexto da IA. Remova segredos antes de enviar.</p>
+  <label for="codigo-arquivos">Abrir arquivos de código</label>
+  <input id="codigo-arquivos" type="file" multiple>
+  <label for="codigo-ativo">Arquivo ativo</label>
+  <select id="codigo-ativo" disabled></select>
+  <label for="codigo-editor">Cópia de trabalho</label>
+  <textarea id="codigo-editor" class="artefato-editor" maxlength="16000" spellcheck="false"></textarea>
+  <form id="codigo-form">
+    <label for="codigo-pedido">O que você quer fazer?</label>
+    <textarea id="codigo-pedido" rows="3" maxlength="2000" placeholder="Explique este arquivo, sugira testes ou proponha uma alteração específica." required></textarea>
+    <button id="codigo-enviar" class="btn-baixar destaque" type="submit" disabled>Pedir ajuda à Bebi</button>
+    <button id="codigo-baixar" class="btn-baixar" type="button" disabled>Baixar cópia de trabalho</button>
+  </form>
+  <p id="codigo-status" role="status"></p>
+  <p id="codigo-resumo"></p>
+  <div id="codigo-revisao" hidden>
+    <label for="codigo-proposta">Proposta para revisão</label>
+    <textarea id="codigo-proposta" class="artefato-editor" maxlength="16000" spellcheck="false"></textarea>
+    <button id="codigo-aceitar" class="btn-baixar destaque" type="button">Aplicar à cópia de trabalho</button>
+  </div>
+</dialog>
 
 <dialog id="painel-dispositivos" aria-labelledby="dispositivos-titulo">
   <div class="dispositivos-topo">
@@ -4510,5 +4550,7 @@ async function lerEmFluxo(res, typingEl) {
 }
 </script>
 <script src="perifericos.js"></script>
+<script src="codigo.js"></script>
+<script>oficinaCodigo.iniciar();</script>
 </body>
 </html>

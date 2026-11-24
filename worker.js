@@ -188,8 +188,9 @@ export default {
         'preços, fatos recentes), responda APENAS com: BUSCAR: <termos>',
     });
 
+    const podePesquisar = body.codigo !== true;
     // Endereço na mensagem: o conteúdo externo entra apenas como referência.
-    const enderecos = (alvo && alvo.content ? alvo.content.match(/https?:\/\/[^\s<>")]+/g) : null) || [];
+    const enderecos = (podePesquisar ? alvo.content.match(/https?:\/\/[^\s<>")]+/g) : null) || [];
     if (enderecos.length) {
       try {
         const pagina = await lerPagina(enderecos[0], env);
@@ -216,7 +217,7 @@ export default {
         : 'A pesquisa não confirmou dados atuais. Explique essa limitação ao responder.');
     }
 
-    const jaPesquisou = !enderecos.length && PADRAO_ATUAL.test(perguntaOriginal);
+    const jaPesquisou = podePesquisar && !enderecos.length && PADRAO_ATUAL.test(perguntaOriginal);
     if (jaPesquisou) await acrescentarPesquisa(perguntaOriginal.slice(0, 200));
 
     // Modo fluxo: a resposta sai em pedaços, conforme o modelo escreve.
@@ -228,7 +229,7 @@ export default {
         const r = await chamarIA(env, modeloEmUso, {
           messages: messages, max_tokens: 1200, stream: true,
         });
-        return new Response(montarFluxo(r.resultado, fontes, jaPesquisou ? null : async function (termos) {
+        return new Response(montarFluxo(r.resultado, fontes, !podePesquisar || jaPesquisou ? null : async function (termos) {
           await acrescentarPesquisa(termos);
           return (await chamarIA(env, modeloEmUso, { messages, max_tokens: 1200, stream: true })).resultado;
         }), {
@@ -252,7 +253,7 @@ export default {
       if (jaPesquisou) resposta = resposta.replace(/BUSCAR:.*/gi, '').trim();
 
       // O modelo pediu pesquisa: buscamos e perguntamos de novo com os dados.
-      const pedido = jaPesquisou ? null : resposta.trimStart().match(/^BUSCAR:\s*(.+)/i);
+      const pedido = !podePesquisar || jaPesquisou ? null : resposta.trimStart().match(/^BUSCAR:\s*(.+)/i);
       if (pedido && alvo) {
         const termos = pedido[1].split('\n')[0].trim().slice(0, 120);
         await acrescentarPesquisa(termos);

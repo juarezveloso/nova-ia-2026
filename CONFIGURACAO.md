@@ -648,3 +648,17 @@ Em um cartão de arquivo gerado, abra **Visualizar e editar conteúdo** para
 revisar o texto antes do download. O editor exibe texto simples e as alterações
 valem para o download daquele cartão. No histórico lateral, use o botão de
 exportação de uma conversa para baixá-la em Markdown.
+
+### Espaço de código
+
+Abra **Menu → Espaço de código**, selecione até oito arquivos de texto e
+escolha o arquivo ativo. Peça explicações, sugestões de testes ou uma
+alteração pequena. Ao enviar, o conteúdo do arquivo ativo e trechos dos
+demais arquivos selecionados vão ao Worker configurado para a Bebi.
+
+A proposta é comparada com o trecho original e aparece para revisão.
+Use **Aplicar à cópia de trabalho** e **Baixar cópia de trabalho** para
+obter a versão revisada. Os arquivos originais permanecem no dispositivo.
+Sugestões de teste aparecem como texto para você avaliar e executar.
+Publique o Worker desta versão para usar o modo de código com a pesquisa
+externa desativada.

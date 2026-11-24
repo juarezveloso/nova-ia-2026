@@ -151,3 +151,12 @@ test('reconhece os cômodos da planta e descarta linhas duplicadas', async () =>
   const { comodos } = await resposta.json();
   assert.deepEqual(comodos.map(({ nome, area }) => [nome, area]), [['SALA', 12], ['QUARTO', 9]]);
 });
+
+test('modo código não consulta links nem segue pedidos BUSCAR do modelo', async (t) => {
+  const rede = t.mock.method(globalThis, 'fetch', () => assert.fail('consulta externa'));
+  const resposta = await chamar({
+    codigo: true, messages: [mensagem('Revise o preço atual em https://www.nasa.gov/')],
+  }, async () => ({ response: 'BUSCAR: um termo' }));
+  assert.equal(resposta.status, 200);
+  assert.equal(rede.mock.callCount(), 0);
+});
