@@ -1042,7 +1042,7 @@
   <button id="voz-ia-btn" onclick="alternarVozIA()" title="Ler as respostas em voz alta" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path class="onda" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="onda" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
   </button>
-  <div class="badge">v2026.33</div>
+  <div class="badge">v2026.34</div>
 </header>
 
 
@@ -1128,20 +1128,20 @@ Como posso te ajudar hoje?</div>
 </dialog>
 
 <div id="input-area">
-  <div id="status-voz"></div>
+  <div id="status-voz" role="status"></div>
   <div id="attachments"></div>
   <div class="input-wrapper">
     <input type="file" id="file-input" multiple hidden>
-    <button id="mic-btn" onclick="alternarVoz()" title="Falar em vez de digitar">
-      <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    <button id="mic-btn" aria-label="Ditar mensagem" onclick="alternarVoz()" title="Falar em vez de digitar">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
     </button>
-    <button id="attach-btn" onclick="document.getElementById('file-input').click()" title="Anexar documento ou imagem">
-      <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+    <button id="attach-btn" aria-label="Anexar arquivo" onclick="document.getElementById('file-input').click()" title="Anexar documento ou imagem">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
     </button>
-    <button id="desenhar-btn" onclick="alternarModoDesenho()" title="Gerar uma imagem a partir do texto">🎨</button>
+    <button id="desenhar-btn" aria-label="Gerar imagem" onclick="alternarModoDesenho()" title="Gerar uma imagem a partir do texto"><span aria-hidden="true">🎨</span></button>
     <textarea id="user-input" placeholder="Digite sua pergunta ou anexe um documento..." rows="1"></textarea>
-    <button id="send-btn" onclick="sendMessage()" title="Enviar">
-      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    <button id="send-btn" aria-label="Enviar mensagem" onclick="sendMessage()" title="Enviar">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
   </div>
   <p class="hint">Enter para enviar • 🎤 fale • 📎 anexe • 🎨 desenhe • 🏠 anexe uma planta e peça "em 3D"</p>
@@ -1226,6 +1226,11 @@ async function sendMessage() {
   if (btn.disabled) return;
   pararFala();              // silencia a leitura anterior
   rosto(null);
+  if (transcrevendo) return;
+  if (ouvindo && gravador) {
+    pararVoz();
+    return;
+  }
   if (ouvindo) pararVoz();  // encerra o ditado antes de enviar
 
   const input = document.getElementById('user-input');
@@ -1858,8 +1863,8 @@ const PODE_GRAVAR = !!(navigator.mediaDevices && navigator.mediaDevices.getUserM
 let ouvindo = false;
 let reconhecedor = null;
 let gravador = null;
-let fluxoAudio = null;
-let pedacosAudio = [];
+let transcrevendo = false;
+let preferirTranscricao = false;
 
 // Estado da fala. Separar em três partes evita somar o mesmo trecho duas vezes:
 let idSessaoVoz = 0;   // invalida eventos de reconhecedores já descartados
@@ -1939,6 +1944,8 @@ function marcarBotaoVoz(ativo) {
   if (ativo) btn.classList.add('gravando');
   else btn.classList.remove('gravando');
   btn.title = ativo ? 'Parar de gravar' : 'Falar em vez de digitar';
+  btn.setAttribute('aria-label', ativo ? 'Parar ditado' : 'Ditar mensagem');
+  btn.setAttribute('aria-pressed', String(ativo));
 }
 
 function alternarVoz() {
@@ -1947,15 +1954,15 @@ function alternarVoz() {
 }
 
 function iniciarVoz() {
+  if (transcrevendo) return;
   ouvindo = true;
   marcarBotaoVoz(true);
   rosto('ouvindo');
-  if (RECONHECIMENTO_NATIVO) {
+  if (RECONHECIMENTO_NATIVO && !preferirTranscricao) {
     mostrarStatusVoz('🎤 Ouvindo… fale à vontade (clique no microfone para parar)');
     iniciarReconhecimentoNativo();
   } else {
-    mostrarStatusVoz('🎤 Gravando… clique no microfone para parar');
-    iniciarGravacao();
+    iniciarGravacao(++idSessaoVoz);
   }
 }
 
@@ -1972,8 +1979,10 @@ function pararVoz(jaEncerrou) {
     if (!jaEncerrou) mostrarStatusVoz('');
   }
   if (gravador && gravador.state === 'recording') {
-    gravador.stop(); // dispara a transcrição
-  } else if (!RECONHECIMENTO_NATIVO) {
+    transcrevendo = true;
+    mostrarStatusVoz('⏳ Transcrevendo…');
+    gravador.stop();
+  } else if (!jaEncerrou) {
     mostrarStatusVoz('');
   }
   document.getElementById('user-input').focus();
@@ -2019,14 +2028,24 @@ function iniciarReconhecimentoNativo() {
     // Silêncio curto ou parada normal não são erros: o onend recomeça sozinho.
     if (e.error === 'no-speech' || e.error === 'aborted') return;
 
+    if (['network', 'service-not-allowed', 'language-not-supported'].includes(e.error) &&
+        PODE_GRAVAR && navigator.onLine) {
+      preferirTranscricao = true;
+      const nativo = reconhecedor;
+      reconhecedor = null;
+      const tentativa = ++idSessaoVoz;
+      try { nativo.abort(); } catch (erro) {}
+      iniciarGravacao(tentativa, true);
+      return;
+    }
+
     const motivos = {
       'not-allowed': 'Permissão do microfone negada — libere nas configurações do navegador',
       'service-not-allowed': 'O navegador bloqueou o reconhecimento de voz',
       'audio-capture': 'Nenhum microfone encontrado',
-      'network': 'Sem conexão para o reconhecimento de voz',
+      'network': navigator.onLine ? 'O serviço de ditado do navegador está indisponível.' : 'Conecte-se à internet para usar o ditado.',
     };
     mostrarStatusVoz(motivos[e.error] || ('Erro no reconhecimento: ' + e.error));
-    setTimeout(function () { mostrarStatusVoz(''); }, 3500);
     pararVoz(true);
   };
 
@@ -2065,54 +2084,78 @@ function iniciarReconhecimentoNativo() {
 }
 
 // Caminho 2: grava e transcreve pelo Whisper no Worker
-async function iniciarGravacao() {
+async function iniciarGravacao(sessao, reserva) {
+  let fluxo;
   try {
-    fluxoAudio = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (!navigator.onLine) {
+      pararVoz(true);
+      mostrarStatusVoz('Conecte-se à internet para transcrever o áudio.');
+      return;
+    }
+    mostrarStatusVoz(reserva ? 'Ditado do navegador indisponível. Tentando o microfone da Bebi…' : 'Aguardando o microfone…');
+    fluxo = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (sessao !== idSessaoVoz || !ouvindo) {
+      fluxo.getTracks().forEach(function (t) { t.stop(); });
+      return;
+    }
+
+    const partes = [];
+    const recorder = new MediaRecorder(fluxo);
+    let falhou = false;
+    recorder.ondataavailable = function (e) { if (e.data?.size) partes.push(e.data); };
+    recorder.onerror = function () {
+      falhou = true;
+      fluxo.getTracks().forEach(function (t) { t.stop(); });
+      if (gravador !== recorder) return;
+      gravador = null;
+      transcrevendo = false;
+      pararVoz(true);
+      mostrarStatusVoz('A gravação falhou. Tente novamente.');
+    };
+    recorder.onstop = function () {
+      fluxo.getTracks().forEach(function (t) { t.stop(); });
+      if (falhou || gravador !== recorder) return;
+      gravador = null;
+      if (ouvindo) pararVoz(true);
+      transcrevendo = true;
+      void transcreverGravacao(new Blob(partes, { type: recorder.mimeType || 'audio/webm' }));
+    };
+    recorder.start();
+    gravador = recorder;
+    mostrarStatusVoz('🎤 Gravando. Clique no microfone para transcrever pela Bebi.');
   } catch (e) {
-    mostrarStatusVoz('Permissão do microfone negada');
-    setTimeout(function () { mostrarStatusVoz(''); }, 3500);
+    fluxo?.getTracks().forEach(function (t) { t.stop(); });
+    if (sessao !== idSessaoVoz) return;
     pararVoz(true);
-    return;
+    mostrarStatusVoz(e.name === 'NotAllowedError' ? 'Permita o uso do microfone nas configurações do navegador.'
+      : e.name === 'NotFoundError' ? 'Nenhum microfone encontrado.' : 'Não consegui iniciar a gravação.');
   }
-  pedacosAudio = [];
-  gravador = new MediaRecorder(fluxoAudio);
-  gravador.ondataavailable = function (e) { if (e.data && e.data.size) pedacosAudio.push(e.data); };
-  gravador.onstop = transcreverGravacao;
-  gravador.start();
 }
 
-async function transcreverGravacao() {
-  if (fluxoAudio) {
-    fluxoAudio.getTracks().forEach(function (t) { t.stop(); });
-    fluxoAudio = null;
-  }
-  const tipo = gravador && gravador.mimeType ? gravador.mimeType : 'audio/webm';
-  gravador = null;
-
-  if (!pedacosAudio.length) { mostrarStatusVoz(''); return; }
-
-  mostrarStatusVoz('⏳ Transcrevendo…');
+async function transcreverGravacao(audio) {
   try {
-    const base64 = await blobParaWavBase64(new Blob(pedacosAudio, { type: tipo }));
-    const res = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audio: base64 })
-    });
+    if (!audio.size) {
+      mostrarStatusVoz('Nenhum áudio foi gravado. Tente novamente.');
+      return;
+    }
+    mostrarStatusVoz('⏳ Transcrevendo…');
+    const base64 = await blobParaWavBase64(audio);
+    const res = await enviarAoServidor({ audio: base64 }, 1);
     const d = await res.json();
     if (!res.ok || !d.texto) {
-      mostrarStatusVoz('Não consegui entender o áudio. Tente de novo.');
-      setTimeout(function () { mostrarStatusVoz(''); }, 3500);
+      mostrarStatusVoz(d.error?.message ? 'Falha na transcrição: ' + d.error.message
+        : 'Não consegui entender o áudio. Tente novamente.');
       return;
     }
     const input = document.getElementById('user-input');
-    input.value = (input.value.trim() ? input.value.trim() + ' ' : '') + d.texto;
+    input.value = juntarSemRepetir(input.value, d.texto);
     autoResize(input);
     input.focus();
     mostrarStatusVoz('');
   } catch (e) {
-    mostrarStatusVoz('Falha ao transcrever o áudio');
-    setTimeout(function () { mostrarStatusVoz(''); }, 3500);
+    mostrarStatusVoz('A transcrição falhou. Verifique a conexão e tente novamente.');
+  } finally {
+    transcrevendo = false;
   }
 }
 
@@ -2231,41 +2274,19 @@ function contemAlgum(texto, lista) {
   return false;
 }
 
-// Quanto maior a nota, melhor a voz para o nosso caso.
-// Quanto maior a nota, melhor a voz. Duas coisas pesam: ser feminina e ser
-// natural (neural). As vozes locais antigas soam robóticas, então perdem
-// para as neurais, que o navegador costuma marcar como "online"/"natural".
-// Quanto maior a nota, melhor a voz. A naturalidade pesa mais que o gênero:
-// uma voz masculina neural ganha de uma feminina robótica. Entre vozes de
-// qualidade parecida, a feminina é preferida como desempate.
-function notaDaVoz(v) {
-  const nome = (v.name || '').toLowerCase();
-  let nota = 0;
-
-  if (/pt[-_]?br/i.test(v.lang)) nota += 10;             // português do Brasil primeiro
-  if (contemAlgum(nome, VOZES_NATURAIS)) nota += 30;     // voz neural: bem menos robótica
-  if (nome.indexOf('google') !== -1) nota += 15;         // as do Google soam bem melhor
-  if (!v.localService) nota += 8;                        // voz de rede: normalmente é a neural
-  if (contemAlgum(nome, VOZES_FEMININAS)) nota += 12;    // desempate: preferimos feminina
-  if (contemAlgum(nome, VOZES_MASCULINAS)) nota -= 6;
-
-  return nota;
-}
 function ehVozNatural(v) {
   const nome = (v.name || '').toLowerCase();
-  return contemAlgum(nome, VOZES_NATURAIS) || nome.indexOf('google') !== -1;
+  return contemAlgum(nome, VOZES_NATURAIS) || nome.includes('google');
 }
-// Escolhe a voz em duas etapas, para que o gênero pedido nunca perca para a
-// qualidade: primeiro separa as candidatas femininas, e só entre elas escolhe
-// a mais natural. Sem isso, uma voz masculina neural ganhava de uma feminina.
-// Escolhe a melhor voz disponível pela nota: qualidade em primeiro lugar,
-// com a voz feminina levando vantagem quando o resto se equivale.
-function escolherMelhorVoz(lista) {
-  if (!lista.length) return null;
-  return lista.slice().sort(function (a, b) {
-    return notaDaVoz(b) - notaDaVoz(a);
-  })[0];
+
+function notaDaVoz(v) {
+  const nome = (v.name || '').toLowerCase();
+  const natural = ehVozNatural(v);
+  return (natural ? 50 : 0) + (/^pt[-_]br$/i.test(v.lang) ? 28 : 0) +
+    (contemAlgum(nome, VOZES_FEMININAS) ? 10 : 0) +
+    (contemAlgum(nome, VOZES_MASCULINAS) ? -4 : 0) + (v.default ? 2 : 0);
 }
+
 function carregarVozes() {
   if (!TEM_SINTESE) return;
   const todas = window.speechSynthesis.getVoices() || [];
@@ -2274,7 +2295,7 @@ function carregarVozes() {
 
   const salva = lerPreferencia('novaia-voz-nome');
   const preferida = salva ? vozesPortugues.filter(function (v) { return v.name === salva; })[0] : null;
-  vozEscolhida = preferida || escolherMelhorVoz(vozesPortugues);
+  vozEscolhida = preferida || vozesPortugues[0] || null;
 
   montarSeletorDeVoz();
 }
@@ -2284,17 +2305,18 @@ function montarSeletorDeVoz() {
   const barra = document.getElementById('barra-voz');
   if (!seletor || !barra) return;
 
-  seletor.innerHTML = '';
+  seletor.replaceChildren(new Option('Automática — priorizar voz natural', ''));
+  const salva = lerPreferencia('novaia-voz-nome');
   vozesPortugues.forEach(function (v) {
     const op = document.createElement('option');
     op.value = v.name;
     op.textContent = (ehVozNatural(v) ? '★ ' : '') + v.name;
-    if (vozEscolhida && v.name === vozEscolhida.name) op.selected = true;
+    if (v.name === salva) op.selected = true;
     seletor.appendChild(op);
   });
 
   // Só mostra a escolha de voz quando faz diferença (mais de uma disponível)
-  barra.style.display = (vozAtiva && vozesPortugues.length > 1) ? 'flex' : 'none';
+  barra.style.display = (vozAtiva && vozesPortugues.length > 0) ? 'flex' : 'none';
 }
 
 // Frase de amostra: tem número e entonação variada, o que ajuda a perceber
@@ -2311,6 +2333,12 @@ function testarVoz() {
 }
 
 function escolherVoz(nome) {
+  if (!nome) {
+    salvarPreferencia('novaia-voz-nome', '');
+    carregarVozes();
+    testarVoz();
+    return;
+  }
   const achada = vozesPortugues.filter(function (v) { return v.name === nome; })[0];
   if (!achada) return;
   vozEscolhida = achada;
@@ -2391,12 +2419,14 @@ function falar(texto) {
     .trim();
   if (!limpo) return;
 
-  dividirParaFala(limpo, 180).forEach(function (parte) {
+  const voz = vozEscolhida && (navigator.onLine || vozEscolhida.localService) ? vozEscolhida
+    : vozesPortugues.find(function (v) { return v.localService; });
+  dividirParaFala(limpo, voz && ehVozNatural(voz) ? 235 : 180).forEach(function (parte) {
     const fala = new SpeechSynthesisUtterance(parte);
-    if (vozEscolhida) fala.voice = vozEscolhida;
-    fala.lang = vozEscolhida ? vozEscolhida.lang : 'pt-BR';
+    if (voz) fala.voice = voz;
+    fala.lang = voz ? voz.lang : 'pt-BR';
     // Sem mexer no tom: forçar o tom para cima deixava a voz artificial.
-    fala.rate = 0.97;   // um pouco mais calmo soa mais humano
+    fala.rate = voz && ehVozNatural(voz) ? 1 : 0.95;   // um pouco mais calmo soa mais humano
     fala.pitch = 1;
     fala.volume = 1;
     fala.onstart = function () { rosto('falando'); };
