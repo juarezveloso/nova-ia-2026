@@ -11,6 +11,7 @@ test('reconhece aplicativos e comandos de energia explícitos', () => {
     ['Abrir e-mail Outlook', 'outlook'],
     ['abrir emailoutloook', 'outlook'],
     ['Bebi, pode abrir o Outlook pra mim?', 'outlook'],
+    ['Abra o Outlook no navegador', 'outlook-web'],
     ['Por favor, abra o aplicativo do Outlook no meu computador.', 'outlook'],
     ['Quero abrir meu e-mail do Outlook', 'outlook'],
     ['Abre o out look, por favor.', 'outlook'],

@@ -622,6 +622,10 @@ autorize a abertura do assistente se o navegador perguntar e confirme no
 Windows. Cada pedido é tratado localmente. O Outlook clássico, quando
 encontrado, abre no computador. O Outlook web atende os outros casos.
 
+Ao enviar **abra o Outlook**, a Bebi tenta abrir o assistente de imediato no
+Windows. Para ir diretamente ao site, diga **abra o Outlook no navegador**.
+Se o navegador impedir a abertura, use o link no cartão.
+
 Os comandos de energia não forçam o fechamento de aplicativos. Salve os
 arquivos antes de confirmar. Ligar um PC já desligado exige o botão físico
 ou um recurso como Wake-on-LAN acionado de outro dispositivo.
